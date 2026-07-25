@@ -3779,8 +3779,7 @@ function cleanOldAudioData() {
                 document.getElementById('createMeetingModal').classList.remove('active');
             }
         }
-
-     // ==================== إنشاء اجتماع جديد (تعديل) ====================
+// ==================== إنشاء اجتماع جديد (معدل مع غرفة الانتظار) ====================
 async function createNewMeeting(event) {
     event.preventDefault();
     if (!currentUser) return;
@@ -3797,8 +3796,6 @@ async function createNewMeeting(event) {
     
     const meetingTime = new Date(`${date}T${time}`);
     const endTime = new Date(meetingTime.getTime() + duration * 60000);
-    
-    // توليد معرف فريد
     const meetingId = 'MTG-' + generateMeetingId();
     
     const meetingData = {
@@ -3817,16 +3814,19 @@ async function createNewMeeting(event) {
             screenShare: document.getElementById('meetScreenShare').checked,
             chat: document.getElementById('meetChat').checked,
             recording: document.getElementById('meetRecording').checked,
-            waitingRoom: document.getElementById('meetWaitingRoom').checked
+            waitingRoom: document.getElementById('meetWaitingRoom').checked  // غرفة الانتظار
         },
         participants: {
             [currentUser.uid]: {
                 name: currentUser.name || currentUser.username,
                 joinedAt: new Date().toISOString(),
-                isHost: true
+                isHost: true,
+                isGuest: false,
+                micEnabled: true,
+                videoEnabled: true
             }
         },
-        pendingParticipants: {} // للضيوف المنتظرين موافقة المنشئ
+        pendingParticipants: {}  // قائمة الانتظار
     };
     
     try {
@@ -3846,15 +3846,19 @@ async function createNewMeeting(event) {
 let isScreenFullscreen = false;
 let screenShareElement = null;
 
-// ==================== 3. عرض واجهة شير سكرين ====================
+// ==================== عرض واجهة شير سكرين (معدل) ====================
 function showScreenShareUI() {
     const content = document.querySelector('.meeting-content');
-    if (!content) return;
+    if (!content) {
+        showToast('❌ خطأ في عرض شير سكرين');
+        return;
+    }
     
-    // إزالة الواجهة القديمة
+    // إزالة الواجهة القديمة للشير سكرين
     const oldScreen = content.querySelector('.with-screen-share');
     if (oldScreen) oldScreen.remove();
     
+    // إخفاء الواجهة العادية
     const oldNoScreen = content.querySelector('.no-screen-share');
     if (oldNoScreen) oldNoScreen.style.display = 'none';
     
@@ -3886,11 +3890,13 @@ function showScreenShareUI() {
     const video = document.getElementById('screenShareVideo');
     if (video && screenStream) {
         video.srcObject = screenStream;
-        video.play();
+        video.play().catch(e => console.log('فيديو شير سكرين:', e));
     }
     
     // نقل البطاقات إلى الجانب
-    moveParticipantsToSide();
+    setTimeout(() => {
+        moveParticipantsToSide();
+    }, 100);
 }
 
 // ==================== 3. إضافة شير سكرين للواجهة ====================
@@ -3943,36 +3949,354 @@ function addScreenShareToUI() {
     moveParticipantsToSide();
 }
 
-// ==================== 4. نقل البطاقات إلى الجانب ====================
+// ==================== نقل البطاقات إلى الجانب (معدل) ====================
 function moveParticipantsToSide() {
     const side = document.getElementById('participantsSide');
-    if (!side) return;
+    if (!side) {
+        // إذا لم يكن هناك جانب، حاول إيجاده
+        const screenDiv = document.querySelector('.with-screen-share');
+        if (screenDiv) {
+            const newSide = screenDiv.querySelector('.participants-side');
+            if (newSide) {
+                // استمر باستخدام newSide
+                side = newSide;
+            } else {
+                return;
+            }
+        } else {
+            return;
+        }
+    }
     
     side.innerHTML = '';
     
-    // الحصول على جميع بطاقات المشاركين
-    const allCards = document.querySelectorAll('.participant-mini');
-    const mainCard = document.getElementById('mainParticipantMini');
+    // الحصول على جميع بطاقات المشاركين من الـ grid
+    const grid = document.getElementById('participantsGrid');
+    if (!grid) return;
     
-    // إضافة البطاقة الرئيسية أولاً
-    if (mainCard) {
-        const clone = mainCard.cloneNode(true);
-        clone.id = 'mainParticipantMini';
+    const cards = grid.querySelectorAll('.participant-mini');
+    
+    // إضافة جميع البطاقات إلى الجانب
+    cards.forEach(card => {
+        const clone = card.cloneNode(true);
         clone.style.maxHeight = '100px';
         clone.style.minHeight = '60px';
         side.appendChild(clone);
-    }
+    });
+}
+// ==================== 1. عرض شاشة الانتظار ====================
+function showWaitingScreen(meetingId, userName) {
+    // إزالة أي شاشة انتظار موجودة
+    const existing = document.getElementById('waitingScreen');
+    if (existing) existing.remove();
     
-    // إضافة باقي البطاقات
-    allCards.forEach(card => {
-        if (card.id !== 'mainParticipantMini' && card.id !== 'mainParticipant') {
-            const clone = card.cloneNode(true);
-            clone.style.maxHeight = '100px';
-            clone.style.minHeight = '60px';
-            side.appendChild(clone);
+    const waitingDiv = document.createElement('div');
+    waitingDiv.id = 'waitingScreen';
+    waitingDiv.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        padding: 20px;
+    `;
+    
+    waitingDiv.innerHTML = `
+        <div style="text-align: center; max-width: 400px; width: 100%;">
+            <div style="font-size: 60px; margin-bottom: 20px;">⏳</div>
+            <h2 style="color: #fff; font-size: 24px; margin-bottom: 10px;">في انتظار الموافقة</h2>
+            <p style="color: rgba(255,255,255,0.7); font-size: 16px; margin-bottom: 20px;">
+                مرحباً <strong style="color: #60a5fa;">${userName}</strong>
+            </p>
+            <p style="color: rgba(255,255,255,0.5); font-size: 14px; margin-bottom: 30px;">
+                ينتظر منشئ الاجتماع الموافقة على دخولك
+            </p>
+            <div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 30px;">
+                <div style="width: 12px; height: 12px; background: #60a5fa; border-radius: 50%; animation: waitingPulse 1.5s ease-in-out infinite;"></div>
+                <div style="width: 12px; height: 12px; background: #60a5fa; border-radius: 50%; animation: waitingPulse 1.5s ease-in-out 0.3s infinite;"></div>
+                <div style="width: 12px; height: 12px; background: #60a5fa; border-radius: 50%; animation: waitingPulse 1.5s ease-in-out 0.6s infinite;"></div>
+            </div>
+            <button onclick="cancelJoinRequest('${meetingId}')" style="
+                background: rgba(255,255,255,0.1);
+                border: 1px solid rgba(255,255,255,0.2);
+                color: #fff;
+                padding: 10px 30px;
+                border-radius: 30px;
+                cursor: pointer;
+                font-size: 14px;
+                transition: all 0.3s;
+            " onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">
+                <i class="fas fa-times"></i> إلغاء الطلب
+            </button>
+        </div>
+        <style>
+            @keyframes waitingPulse {
+                0%, 100% { transform: scale(1); opacity: 1; }
+                50% { transform: scale(1.5); opacity: 0.5; }
+            }
+        </style>
+    `;
+    
+    document.body.appendChild(waitingDiv);
+    
+    // بدء الاستماع للتغييرات
+    startWaitingListener(meetingId);
+}
+
+// ==================== 2. الاستماع لتغييرات طلب الدخول ====================
+function startWaitingListener(meetingId) {
+    const pendingRef = db.ref(`meetings/${meetingId}/pendingParticipants/${currentUser.uid}`);
+    
+    pendingRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (!data) {
+            // تمت الموافقة أو الرفض
+            pendingRef.off();
+            
+            // التحقق من المشاركين
+            db.ref(`meetings/${meetingId}/participants/${currentUser.uid}`).once('value').then(participantSnap => {
+                if (participantSnap.val()) {
+                    // تمت الموافقة - إزالة شاشة الانتظار والانضمام
+                    removeWaitingScreen();
+                    showToast('✅ تمت الموافقة على انضمامك');
+                    joinMeetingRoom(meetingId);
+                } else {
+                    // تم الرفض
+                    removeWaitingScreen();
+                    showToast('❌ تم رفض طلب الانضمام');
+                    // العودة إلى صفحة الاجتماعات
+                    setTimeout(() => {
+                        goToMeetingsRoom();
+                    }, 2000);
+                }
+            });
+        }
+    });
+    
+    // الاستماع لحالة الاجتماع (إذا انتهى)
+    db.ref(`meetings/${meetingId}/status`).on('value', (snapshot) => {
+        const status = snapshot.val();
+        if (status === 'ended') {
+            pendingRef.off();
+            removeWaitingScreen();
+            showToast('❌ تم إنهاء الاجتماع');
+            setTimeout(() => {
+                goToMeetingsRoom();
+            }, 2000);
         }
     });
 }
+
+// ==================== 3. إزالة شاشة الانتظار ====================
+function removeWaitingScreen() {
+    const waiting = document.getElementById('waitingScreen');
+    if (waiting) waiting.remove();
+    
+    // إلغاء الاستماع
+    if (currentRoomMeetingId) {
+        db.ref(`meetings/${currentRoomMeetingId}/pendingParticipants/${currentUser?.uid}`).off();
+        db.ref(`meetings/${currentRoomMeetingId}/status`).off();
+    }
+}
+
+// ==================== 4. إلغاء طلب الدخول ====================
+async function cancelJoinRequest(meetingId) {
+    if (!currentUser) return;
+    
+    try {
+        const pendingRef = db.ref(`meetings/${meetingId}/pendingParticipants/${currentUser.uid}`);
+        await pendingRef.remove();
+        removeWaitingScreen();
+        showToast('✅ تم إلغاء طلب الدخول');
+        goToMeetingsRoom();
+    } catch (error) {
+        console.error('خطأ في إلغاء الطلب:', error);
+        showToast('❌ حدث خطأ في إلغاء الطلب');
+    }
+}
+
+// ==================== 5. عرض إشعار طلب الدخول للمنشئ ====================
+function showJoinRequestNotification(meetingId, userId, userName) {
+    // التحقق من أن المستخدم الحالي هو المنشئ
+    db.ref(`meetings/${meetingId}`).once('value').then(snapshot => {
+        const meeting = snapshot.val();
+        if (!meeting || meeting.creatorId !== currentUser?.uid) return;
+        
+        // إنشاء الإشعار
+        const notification = document.createElement('div');
+        notification.id = `joinRequest_${userId}`;
+        notification.style.cssText = `
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: rgba(26, 26, 46, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 16px;
+            padding: 16px 20px;
+            z-index: 1500;
+            max-width: 350px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            animation: slideInRight 0.5s ease;
+            color: #fff;
+        `;
+        
+        notification.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                <div style="width: 40px; height: 40px; border-radius: 50%; background: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold;">
+                    ${(userName || 'U').charAt(0).toUpperCase()}
+                </div>
+                <div style="flex: 1;">
+                    <div style="font-weight: bold; font-size: 14px;">${userName}</div>
+                    <div style="font-size: 12px; color: rgba(255,255,255,0.6);">يريد الانضمام إلى الاجتماع</div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="approveJoinRequest('${meetingId}', '${userId}')" style="
+                    flex: 1;
+                    background: #22c55e;
+                    border: none;
+                    color: #fff;
+                    padding: 8px 16px;
+                    border-radius: 12px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: bold;
+                    transition: all 0.3s;
+                " onmouseover="this.style.background='#16a34a'" onmouseout="this.style.background='#22c55e'">
+                    <i class="fas fa-check"></i> قبول
+                </button>
+                <button onclick="rejectJoinRequest('${meetingId}', '${userId}')" style="
+                    flex: 1;
+                    background: #dc3545;
+                    border: none;
+                    color: #fff;
+                    padding: 8px 16px;
+                    border-radius: 12px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: bold;
+                    transition: all 0.3s;
+                " onmouseover="this.style.background='#b02a37'" onmouseout="this.style.background='#dc3545'">
+                    <i class="fas fa-times"></i> رفض
+                </button>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // إزالة الإشعار بعد 30 ثانية
+        setTimeout(() => {
+            const el = document.getElementById(`joinRequest_${userId}`);
+            if (el) {
+                el.style.opacity = '0';
+                el.style.transform = 'translateX(50px)';
+                el.style.transition = 'all 0.5s ease';
+                setTimeout(() => {
+                    if (el.parentNode) el.remove();
+                }, 500);
+            }
+        }, 30000);
+    }).catch(error => {
+        console.error('خطأ في عرض الإشعار:', error);
+    });
+}
+
+// ==================== 6. الموافقة على طلب الدخول ====================
+async function approveJoinRequest(meetingId, userId) {
+    try {
+        const snapshot = await db.ref(`meetings/${meetingId}`).once('value');
+        const meeting = snapshot.val();
+        if (!meeting) return;
+        
+        // إزالة من قائمة الانتظار
+        const pending = meeting.pendingParticipants || {};
+        const userData = pending[userId];
+        if (!userData) return;
+        
+        delete pending[userId];
+        await db.ref(`meetings/${meetingId}/pendingParticipants`).set(pending);
+        
+        // إضافة للمشاركين
+        const participants = meeting.participants || {};
+        participants[userId] = {
+            name: userData.name || 'مستخدم',
+            joinedAt: new Date().toISOString(),
+            isHost: false,
+            isGuest: userData.isGuest || false,
+            micEnabled: true,
+            videoEnabled: true
+        };
+        await db.ref(`meetings/${meetingId}/participants`).set(participants);
+        
+        // إزالة الإشعار
+        const notif = document.getElementById(`joinRequest_${userId}`);
+        if (notif) notif.remove();
+        
+        showToast(`✅ تمت الموافقة على انضمام ${userData.name}`);
+        
+        // تحديث المشاركين
+        updateRoomParticipants(participants);
+        updateParticipantCards(participants);
+        
+    } catch (error) {
+        console.error('خطأ في الموافقة على الانضمام:', error);
+        showToast('❌ حدث خطأ');
+    }
+}
+
+// ==================== 7. رفض طلب الدخول ====================
+async function rejectJoinRequest(meetingId, userId) {
+    try {
+        const snapshot = await db.ref(`meetings/${meetingId}`).once('value');
+        const meeting = snapshot.val();
+        if (!meeting) return;
+        
+        // إزالة من قائمة الانتظار
+        const pending = meeting.pendingParticipants || {};
+        const userData = pending[userId];
+        if (!userData) return;
+        
+        delete pending[userId];
+        await db.ref(`meetings/${meetingId}/pendingParticipants`).set(pending);
+        
+        // إزالة الإشعار
+        const notif = document.getElementById(`joinRequest_${userId}`);
+        if (notif) notif.remove();
+        
+        showToast(`❌ تم رفض انضمام ${userData.name}`);
+        
+    } catch (error) {
+        console.error('خطأ في رفض الانضمام:', error);
+        showToast('❌ حدث خطأ');
+    }
+}
+
+// ==================== 8. الاستماع لطلبات الدخول الجديدة (للمنشئ) ====================
+function listenForJoinRequests(meetingId) {
+    const pendingRef = db.ref(`meetings/${meetingId}/pendingParticipants`);
+    
+    pendingRef.on('child_added', (snapshot) => {
+        const userId = snapshot.key;
+        const userData = snapshot.val();
+        
+        // التحقق من أن المستخدم الحالي هو المنشئ
+        db.ref(`meetings/${meetingId}/creatorId`).once('value').then(creatorSnap => {
+            const creatorId = creatorSnap.val();
+            if (creatorId === currentUser?.uid && userId !== currentUser?.uid) {
+                showJoinRequestNotification(meetingId, userId, userData.name);
+            }
+        });
+    });
+}
+
 
 
 // ==================== 5. إزالة شير سكرين من الواجهة ====================
@@ -4081,51 +4405,86 @@ function closeScreenFullscreen() {
     }
     isScreenFullscreen = false;
 }
-// ==================== 9. إنشاء البطاقات في الوضع العادي ====================
+// ==================== إنشاء التخطيط العادي (معدل) ====================
 function createNormalLayout() {
     const content = document.querySelector('.meeting-content');
-    if (!content) return;
+    if (!content) {
+        // إذا لم يكن هناك meeting-content، حاول إنشائه
+        const roomPage = document.getElementById('meetingRoomPage');
+        if (!roomPage) return;
+        
+        // البحث عن أي محتوى موجود
+        const existing = roomPage.querySelector('.p-4');
+        const newContent = document.createElement('div');
+        newContent.className = 'meeting-content';
+        
+        if (existing) {
+            // نقل المحتوى
+            while (existing.firstChild) {
+                newContent.appendChild(existing.firstChild);
+            }
+            existing.parentNode.replaceChild(newContent, existing);
+        } else {
+            roomPage.appendChild(newContent);
+        }
+        
+        // إعادة تعيين المتغير content
+        content = newContent;
+    }
     
-    // إزالة أي واجهة قديمة
+    // إزالة أي تخطيط قديم
     const oldScreen = content.querySelector('.with-screen-share');
     if (oldScreen) oldScreen.remove();
     
     const oldNoScreen = content.querySelector('.no-screen-share');
-    if (oldNoScreen) oldNoScreen.remove();
+    if (oldNoScreen) {
+        // إذا كان موجوداً، قم بتحديثه بدلاً من إعادة إنشائه
+        return;
+    }
     
-    // إنشاء الوضع العادي
+    // إنشاء التخطيط العادي
     const normalDiv = document.createElement('div');
     normalDiv.className = 'no-screen-share';
     
-    normalDiv.innerHTML = `
-        <div class="main-video-wrapper" id="mainVideoContainer">
-            <video id="localVideo" autoplay muted playsinline></video>
-            <div class="avatar-placeholder" id="videoPlaceholder">
-                <i class="fas fa-user"></i>
-            </div>
-            <div class="name-tag" id="localNameTag">أنت</div>
-            <div class="mic-indicator" id="micIndicator">
-                <span class="bar"></span>
-                <span class="bar"></span>
-                <span class="bar"></span>
-                <span class="bar"></span>
-                <span class="bar"></span>
-            </div>
-            <div class="status-icons">
-                <span class="icon active" id="micStatusIcon" title="المايك">
-                    <i class="fas fa-microphone"></i>
-                </span>
-                <span class="icon active" id="videoStatusIcon" title="الكاميرا">
-                    <i class="fas fa-video"></i>
-                </span>
-            </div>
+    // إنشاء حاوية الفيديو الرئيسية
+    const mainVideo = document.createElement('div');
+    mainVideo.className = 'main-video-wrapper';
+    mainVideo.id = 'mainVideoContainer';
+    mainVideo.innerHTML = `
+        <video id="localVideo" autoplay muted playsinline></video>
+        <div class="avatar-placeholder" id="videoPlaceholder">
+            <i class="fas fa-user"></i>
         </div>
-        <div class="participants-grid-wrapper" id="participantsGridWrapper">
-            <div class="participants-grid" id="participantsGrid">
-                <!-- سيتم إضافة البطاقات هنا -->
-            </div>
+        <div class="name-tag" id="localNameTag">أنت</div>
+        <div class="mic-indicator" id="micIndicator">
+            <span class="bar"></span>
+            <span class="bar"></span>
+            <span class="bar"></span>
+            <span class="bar"></span>
+            <span class="bar"></span>
+        </div>
+        <div class="status-icons">
+            <span class="icon active" id="micStatusIcon" title="المايك">
+                <i class="fas fa-microphone"></i>
+            </span>
+            <span class="icon active" id="videoStatusIcon" title="الكاميرا">
+                <i class="fas fa-video"></i>
+            </span>
         </div>
     `;
+    
+    // إنشاء حاوية البطاقات
+    const participantsWrapper = document.createElement('div');
+    participantsWrapper.className = 'participants-grid-wrapper';
+    participantsWrapper.id = 'participantsGridWrapper';
+    
+    const participantsGrid = document.createElement('div');
+    participantsGrid.className = 'participants-grid';
+    participantsGrid.id = 'participantsGrid';
+    participantsWrapper.appendChild(participantsGrid);
+    
+    normalDiv.appendChild(mainVideo);
+    normalDiv.appendChild(participantsWrapper);
     
     content.appendChild(normalDiv);
 }
@@ -4711,8 +5070,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // ==================== دوال غرفة الاجتماع الفعلية (WebRTC) ====================
         let currentRoomMeetingId = null;
         let roomChatMessages = [];
-
-       // ==================== الانضمام للاجتماع (معدل) ====================
+// ==================== الانضمام للاجتماع (كامل مع نظام الانتظار) ====================
 async function joinMeetingRoom(meetingId) {
     try {
         const snapshot = await db.ref(`meetings/${meetingId}`).once('value');
@@ -4722,33 +5080,112 @@ async function joinMeetingRoom(meetingId) {
             return;
         }
         
+        // التحقق من غرفة الانتظار
+        if (meeting.settings?.waitingRoom && meeting.creatorId !== currentUser?.uid) {
+            const pending = meeting.pendingParticipants || {};
+            const isPending = pending[currentUser?.uid];
+            
+            // إذا كان المستخدم في قائمة الانتظار
+            if (isPending) {
+                // عرض شاشة الانتظار
+                showWaitingScreen(meetingId, currentUser.name || currentUser.username);
+                return;
+            }
+            
+            // إذا كان المستخدم ليس في قائمة الانتظار وليس مشاركاً
+            if (!meeting.participants?.[currentUser?.uid]) {
+                await requestJoinMeeting(meetingId);
+                return;
+            }
+        }
+        
         currentRoomMeetingId = meetingId;
         showSpecificPage('meetingRoomPage');
         
-        // إنشاء التخطيط الأساسي
+        // الحصول على صفحة الغرفة
         const roomPage = document.getElementById('meetingRoomPage');
-        if (roomPage) {
-            // إضافة meeting-content إذا لم يكن موجوداً
-            let content = roomPage.querySelector('.meeting-content');
-            if (!content) {
-                content = document.createElement('div');
-                content.className = 'meeting-content';
-                // نقل محتوى الصفحة إلى meeting-content
-                const existingContent = roomPage.querySelector('.p-4');
-                if (existingContent) {
-                    roomPage.insertBefore(content, existingContent);
-                    content.appendChild(existingContent);
-                } else {
-                    roomPage.appendChild(content);
-                }
-            }
-            
-            // إنشاء التخطيط العادي
-            createNormalLayout();
+        if (!roomPage) {
+            showToast('❌ خطأ في تحميل صفحة الاجتماع');
+            return;
         }
         
-        document.getElementById('roomMeetingTitle').innerText = meeting.title;
-        document.getElementById('roomMeetingLink').innerText = meeting.meetingId;
+        // البحث عن المحتوى الموجود
+        let existingContent = roomPage.querySelector('.p-4');
+        let content = roomPage.querySelector('.meeting-content');
+        
+        // إذا لم يكن هناك meeting-content، قم بإنشائه
+        if (!content) {
+            content = document.createElement('div');
+            content.className = 'meeting-content';
+            
+            if (existingContent) {
+                while (existingContent.firstChild) {
+                    content.appendChild(existingContent.firstChild);
+                }
+                existingContent.parentNode.replaceChild(content, existingContent);
+            } else {
+                roomPage.appendChild(content);
+            }
+        }
+        
+        // إنشاء التخطيط العادي إذا لم يكن موجوداً
+        let normalLayout = content.querySelector('.no-screen-share');
+        if (!normalLayout) {
+            const oldScreen = content.querySelector('.with-screen-share');
+            if (oldScreen) oldScreen.remove();
+            
+            normalLayout = document.createElement('div');
+            normalLayout.className = 'no-screen-share';
+            
+            // إنشاء حاوية الفيديو الرئيسية
+            const mainVideo = document.createElement('div');
+            mainVideo.className = 'main-video-wrapper';
+            mainVideo.id = 'mainVideoContainer';
+            mainVideo.innerHTML = `
+                <video id="localVideo" autoplay muted playsinline></video>
+                <div class="avatar-placeholder" id="videoPlaceholder">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="name-tag" id="localNameTag">أنت</div>
+                <div class="mic-indicator" id="micIndicator">
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                </div>
+                <div class="status-icons">
+                    <span class="icon active" id="micStatusIcon" title="المايك">
+                        <i class="fas fa-microphone"></i>
+                    </span>
+                    <span class="icon active" id="videoStatusIcon" title="الكاميرا">
+                        <i class="fas fa-video"></i>
+                    </span>
+                </div>
+            `;
+            
+            // إنشاء حاوية البطاقات
+            const participantsWrapper = document.createElement('div');
+            participantsWrapper.className = 'participants-grid-wrapper';
+            participantsWrapper.id = 'participantsGridWrapper';
+            
+            const participantsGrid = document.createElement('div');
+            participantsGrid.className = 'participants-grid';
+            participantsGrid.id = 'participantsGrid';
+            participantsWrapper.appendChild(participantsGrid);
+            
+            normalLayout.appendChild(mainVideo);
+            normalLayout.appendChild(participantsWrapper);
+            
+            content.appendChild(normalLayout);
+        }
+        
+        // تعيين عنوان الاجتماع
+        const titleEl = document.getElementById('roomMeetingTitle');
+        if (titleEl) titleEl.innerText = meeting.title || 'الاجتماع';
+        
+        const linkEl = document.getElementById('roomMeetingLink');
+        if (linkEl) linkEl.innerText = meeting.meetingId || meetingId;
         
         // محاولة تشغيل الكاميرا والمايك
         await startLocalStream();
@@ -4775,18 +5212,36 @@ async function joinMeetingRoom(meetingId) {
         // تحديث حالة الاجتماع
         if (meeting.status !== 'live') {
             await db.ref(`meetings/${meetingId}/status`).set('live');
-            document.getElementById('roomMeetingStatus').className = 'meeting-status status-live text-xs';
-            document.getElementById('roomMeetingStatus').innerText = 'حية 🔴';
+            const statusEl = document.getElementById('roomMeetingStatus');
+            if (statusEl) {
+                statusEl.className = 'meeting-status status-live text-xs';
+                statusEl.innerText = 'حية 🔴';
+            }
+        }
+        
+        // بدء الاستماع لطلبات الدخول (إذا كان المستخدم هو المنشئ)
+        if (meeting.creatorId === currentUser?.uid) {
+            listenForJoinRequests(meetingId);
+        }
+        
+        // بدء مؤشرات الصوت
+        startAudioIndicators();
+        
+        // بدء إرسال مستوى الصوت
+        if (typeof sendAudioLevel === 'function') {
+            setInterval(() => {
+                sendAudioLevel();
+            }, 200);
         }
         
         showToast('✅ مرحباً بك في الاجتماع');
         
     } catch (error) {
         console.error('خطأ في الانضمام للاجتماع:', error);
-        showToast('❌ حدث خطأ في الانضمام للاجتماع');
+        showToast('❌ حدث خطأ في الانضمام للاجتماع: ' + error.message);
     }
 }
-// ==================== طلب الانضمام للاجتماع ====================
+// ==================== 9. طلب الانضمام للاجتماع (معدل) ====================
 async function requestJoinMeeting(meetingId) {
     try {
         const snapshot = await db.ref(`meetings/${meetingId}`).once('value');
@@ -4796,36 +5251,23 @@ async function requestJoinMeeting(meetingId) {
             return;
         }
         
+        const userName = currentUser?.name || currentUser?.username || 'مستخدم';
+        
         // إضافة المستخدم لقائمة الانتظار
         const pending = meeting.pendingParticipants || {};
         pending[currentUser.uid] = {
-            name: currentUser.name || currentUser.username,
+            name: userName,
             requestedAt: new Date().toISOString(),
             isGuest: currentUser.isGuest || false
         };
         
         await db.ref(`meetings/${meetingId}/pendingParticipants`).set(pending);
         
-        showToast('⏳ جاري طلب الانضمام... في انتظار موافقة المنشئ');
+        // عرض شاشة الانتظار
+        showWaitingScreen(meetingId, userName);
         
-        // الاستماع للتغييرات في قائمة الانتظار
-        const pendingRef = db.ref(`meetings/${meetingId}/pendingParticipants/${currentUser.uid}`);
-        pendingRef.on('value', (snapshot) => {
-            const data = snapshot.val();
-            if (!data) {
-                // تمت الموافقة أو الرفض
-                pendingRef.off();
-                // التحقق من المشاركين
-                db.ref(`meetings/${meetingId}/participants/${currentUser.uid}`).once('value').then(participantSnap => {
-                    if (participantSnap.val()) {
-                        showToast('✅ تمت الموافقة على انضمامك');
-                        joinMeetingRoom(meetingId);
-                    } else {
-                        showToast('❌ تم رفض طلب الانضمام');
-                    }
-                });
-            }
-        });
+        // إرسال إشعار للمنشئ (سيتم الاستماع له)
+        showToast('⏳ جاري طلب الانضمام... في انتظار موافقة المنشئ');
         
     } catch (error) {
         console.error('خطأ في طلب الانضمام:', error);
