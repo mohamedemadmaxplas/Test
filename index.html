@@ -3143,6 +3143,76 @@
 .audio-indicator .bar.active {
     background: #22c55e;
 }
+/* ==================== العرض الكامل للشاشة ==================== */
+.screen-share-fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    background: #0a0a1a;
+    display: none;
+    flex-direction: column;
+}
+
+.screen-share-fullscreen.active {
+    display: flex !important;
+}
+
+.screen-share-fullscreen video {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #0a0a1a;
+}
+
+.screen-share-fullscreen .fullscreen-controls {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 12px;
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.85);
+    padding: 12px 24px;
+    border-radius: 50px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.screen-share-fullscreen .fullscreen-controls button {
+    padding: 8px 22px;
+    border: none;
+    border-radius: 30px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.screen-share-fullscreen .fullscreen-controls button:hover {
+    transform: scale(1.05);
+}
+
+.screen-share-fullscreen .fullscreen-controls .close-fullscreen-btn {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.screen-share-fullscreen .fullscreen-controls .close-fullscreen-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.screen-share-fullscreen .fullscreen-controls .stop-fullscreen-btn {
+    background: #dc3545;
+}
+
+.screen-share-fullscreen .fullscreen-controls .stop-fullscreen-btn:hover {
+    background: #b02a37;
+}
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
@@ -4627,7 +4697,7 @@ function updateSpeakingIndicator(uid, isSpeaking) {
 
 
 
-// ==================== فتح العرض الكامل (مُصلح) ====================
+// ==================== فتح العرض الكامل (مُصلح بالكامل) ====================
 function openScreenFullscreen() {
     // التأكد من عدم وجود عرض كامل مفتوح
     const existing = document.getElementById('screenShareFullscreen');
@@ -4635,60 +4705,100 @@ function openScreenFullscreen() {
         existing.remove();
     }
     
+    // الحصول على فيديو الشير سكرين
     const screenVideo = document.getElementById('screenShareVideo');
-    let videoSrc = screenVideo ? screenVideo.srcObject : null;
+    let videoSrc = null;
+    
+    if (screenVideo && screenVideo.srcObject) {
+        videoSrc = screenVideo.srcObject;
+    } else {
+        // محاولة البحث عن أي فيديو شير سكرين
+        const anyVideo = document.querySelector('.screen-share-wrapper video, .screen-main video');
+        if (anyVideo && anyVideo.srcObject) {
+            videoSrc = anyVideo.srcObject;
+        }
+    }
     
     if (!videoSrc) {
         showToast('❌ لا توجد شاشة مشتركة');
         return;
     }
     
+    // إنشاء عنصر العرض الكامل
     const fullDiv = document.createElement('div');
     fullDiv.className = 'screen-share-fullscreen active';
     fullDiv.id = 'screenShareFullscreen';
     
     fullDiv.innerHTML = `
         <video id="fullscreenVideo" autoplay playsinline></video>
-        <div class="fullscreen-controls">
-            <button onclick="closeScreenFullscreen()" class="close-fullscreen-btn">
-                <i class="fas fa-compress"></i> تصغير
-            </button>
-            <button onclick="stopScreenShare()" class="stop-fullscreen-btn">
-                <i class="fas fa-stop"></i> إيقاف المشاركة
-            </button>
-        </div>
+       <!-- داخل fullscreen-controls -->
+<div class="fullscreen-controls">
+    <button onclick="closeScreenFullscreen()" class="close-fullscreen-btn">
+        <i class="fas fa-compress"></i> تصغير
+    </button>
+    <button onclick="stopScreenShare()" class="stop-fullscreen-btn">
+        <i class="fas fa-stop"></i> إيقاف المشاركة
+    </button>
+</div>
     `;
     
-    const fullVideo = fullDiv.querySelector('#fullscreenVideo');
-    if (fullVideo && videoSrc) {
-        fullVideo.srcObject = videoSrc;
-        fullVideo.play().catch(e => console.log('فيديو كامل:', e));
-    }
-    
+    // إضافة إلى الصفحة
     document.body.appendChild(fullDiv);
     
-    // إضافة مستمع للضغط على ESC لإغلاق العرض الكامل
+    // تعيين مصدر الفيديو
+    const fullVideo = fullDiv.querySelector('#fullscreenVideo');
+    if (fullVideo && videoSrc) {
+        // إنشاء مسار فيديو جديد لتجنب مشاكل الإزالة
+        try {
+            // استخدام نفس المصدر ولكن مع clone
+            fullVideo.srcObject = videoSrc;
+            fullVideo.play().catch(e => {
+                console.log('خطأ في تشغيل الفيديو الكامل:', e);
+                // محاولة إعادة التشغيل
+                setTimeout(() => {
+                    fullVideo.play().catch(e2 => console.log('فشل إعادة التشغيل:', e2));
+                }, 100);
+            });
+        } catch (error) {
+            console.error('خطأ في تعيين الفيديو:', error);
+        }
+    }
+    
+    // إضافة مستمع للضغط على ESC
     document.addEventListener('keydown', function escHandler(e) {
         if (e.key === 'Escape') {
             closeScreenFullscreen();
             document.removeEventListener('keydown', escHandler);
         }
     });
+    
+    showToast('🖥️ تم تكبير الشاشة');
 }
-// ==================== إغلاق العرض الكامل (مُصلح) ====================
+
+// ==================== إغلاق العرض الكامل (مُصلح بالكامل) ====================
 function closeScreenFullscreen() {
     const fullDiv = document.getElementById('screenShareFullscreen');
-    if (fullDiv) {
-        // إيقاف الفيديو
-        const video = fullDiv.querySelector('video');
-        if (video) {
-            video.pause();
-            video.srcObject = null;
-        }
-        // إزالة العنصر
-        fullDiv.remove();
-        console.log('✅ تم إغلاق العرض الكامل');
+    if (!fullDiv) {
+        return;
     }
+    
+    // إيقاف الفيديو بشكل صحيح
+    const video = fullDiv.querySelector('video');
+    if (video) {
+        try {
+            // إيقاف التشغيل
+            video.pause();
+            // إزالة المصدر
+            video.srcObject = null;
+            // إزالة أي مسارات
+            video.load();
+        } catch (error) {
+            console.log('خطأ في إيقاف الفيديو:', error);
+        }
+    }
+    
+    // إزالة العنصر
+    fullDiv.remove();
     
     // إزالة مستمع ESC
     document.removeEventListener('keydown', function(e) {
@@ -4696,6 +4806,17 @@ function closeScreenFullscreen() {
             closeScreenFullscreen();
         }
     });
+    
+    // تحديث واجهة الشير سكرين
+    setTimeout(() => {
+        // التأكد من أن فيديو الشير سكرين لا يزال يعمل
+        const screenVideo = document.getElementById('screenShareVideo');
+        if (screenVideo && screenVideo.srcObject) {
+            screenVideo.play().catch(e => console.log('إعادة تشغيل الشير سكرين:', e));
+        }
+    }, 200);
+    
+    showToast('✅ تم تصغير الشاشة');
 }
         function activateAdminAccount() {
             if (currentUser) {
@@ -6495,7 +6616,40 @@ async function rejectJoinRequest(meetingId, userId) {
         showToast('❌ حدث خطأ');
     }
 }
+// ==================== معالجة أخطاء الفيديو ====================
+document.addEventListener('DOMContentLoaded', function() {
+    // معالجة أخطاء تشغيل الفيديو
+    document.addEventListener('error', function(e) {
+        if (e.target.tagName === 'VIDEO') {
+            console.log('خطأ في الفيديو:', e);
+            // محاولة إعادة التشغيل
+            setTimeout(() => {
+                try {
+                    e.target.play();
+                } catch (err) {
+                    console.log('فشل إعادة التشغيل');
+                }
+            }, 500);
+        }
+    }, true);
+});
 
+// ==================== دالة مساعدة لإعادة تعيين فيديو الشير ====================
+function resetScreenShareVideo() {
+    const video = document.getElementById('screenShareVideo');
+    if (video && screenStream) {
+        try {
+            video.pause();
+            video.srcObject = null;
+            setTimeout(() => {
+                video.srcObject = screenStream;
+                video.play().catch(e => console.log('إعادة تشغيل:', e));
+            }, 100);
+        } catch (error) {
+            console.log('خطأ في إعادة تعيين الفيديو:', error);
+        }
+    }
+}
 // ==================== 8. الاستماع لطلبات الدخول الجديدة (للمنشئ) ====================
 function listenForJoinRequests(meetingId) {
     const pendingRef = db.ref(`meetings/${meetingId}/pendingParticipants`);
@@ -6530,7 +6684,7 @@ function removeScreenShareFromUI() {
 }
 
 
-// ==================== تبديل العرض الكامل ====================
+// ==================== تبديل العرض الكامل (مُصلح) ====================
 function toggleScreenFullscreen() {
     const fullscreen = document.getElementById('screenShareFullscreen');
     if (fullscreen && fullscreen.classList.contains('active')) {
@@ -6542,14 +6696,7 @@ function toggleScreenFullscreen() {
 
 
 
-// ==================== 8. إغلاق العرض الكامل ====================
-function closeScreenFullscreen() {
-    const fullDiv = document.getElementById('screenFullscreen');
-    if (fullDiv) {
-        fullDiv.remove();
-    }
-    isScreenFullscreen = false;
-}
+
 // ==================== إنشاء التخطيط العادي (معدل) ====================
 function createNormalLayout() {
     const content = document.querySelector('.meeting-content');
@@ -8305,10 +8452,21 @@ async function roomToggleScreenShare() {
     }
 }
 
-// ==================== إيقاف مشاركة الشاشة ====================
+// ==================== إيقاف مشاركة الشاشة (مُصلح) ====================
 function stopScreenShare() {
+    // إغلاق العرض الكامل أولاً
+    closeScreenFullscreen();
+    
+    // إيقاف تدفق الشير سكرين
     if (screenStream) {
-        screenStream.getTracks().forEach(track => track.stop());
+        try {
+            screenStream.getTracks().forEach(track => {
+                track.stop();
+                track.enabled = false;
+            });
+        } catch (error) {
+            console.log('خطأ في إيقاف تدفق الشير:', error);
+        }
         screenStream = null;
     }
     
@@ -8316,18 +8474,17 @@ function stopScreenShare() {
     isScreenSharingMode = false;
     isScreenFullscreen = false;
     
-    // إغلاق العرض الكامل
-    closeScreenFullscreen();
-    
-    // تحديث التخطيط
-    const participants = window.roomParticipants || {};
-    createMeetingLayout(participants);
-    
+    // تحديث واجهة زر الشير سكرين
     const screenBtn = document.getElementById('roomScreenBtn');
     if (screenBtn) {
         screenBtn.classList.remove('active');
         screenBtn.innerHTML = '<i class="fas fa-desktop"></i>';
+        screenBtn.title = 'مشاركة الشاشة';
     }
+    
+    // تحديث التخطيط
+    const participants = window.roomParticipants || {};
+    createMeetingLayout(participants);
     
     showToast('🖥️ تم إيقاف مشاركة الشاشة');
 }
