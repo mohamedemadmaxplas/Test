@@ -752,6 +752,408 @@
     50% { opacity: 1; }
     100% { opacity: 0.7; }
 }
+/* ==================== تنسيق بطاقات الأعضاء ==================== */
+.meeting-layout {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 80px);
+    gap: 10px;
+    padding: 10px;
+}
+
+.meeting-layout.has-screen-share {
+    flex-direction: row;
+}
+
+/* حاوية الفيديو الرئيسية */
+.main-video-wrapper {
+    flex: 1;
+    position: relative;
+    min-height: 200px;
+    background: #0a0a1a;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.main-video-wrapper video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* حاوية المشاركين الصغار */
+.participants-grid-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    max-height: 100%;
+}
+
+.participants-grid-wrapper .participant-mini {
+    width: 100%;
+    aspect-ratio: 16/9;
+    min-height: 60px;
+    max-height: 120px;
+    background: #0f3460;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+}
+
+.participants-grid-wrapper .participant-mini:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+.participants-grid-wrapper .participant-mini video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.participants-grid-wrapper .participant-mini .avatar-placeholder {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #1a1a2e;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    color: #fff;
+}
+
+.participants-grid-wrapper .participant-mini .name-tag {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    padding: 1px 8px;
+    border-radius: 12px;
+    font-size: 9px;
+    backdrop-filter: blur(5px);
+    max-width: 80%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.participants-grid-wrapper .participant-mini .status-icons-mini {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    display: flex;
+    gap: 3px;
+}
+
+.participants-grid-wrapper .participant-mini .status-icons-mini .icon-mini {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 8px;
+}
+
+.participants-grid-wrapper .participant-mini .status-icons-mini .icon-mini.active {
+    background: rgba(34, 197, 94, 0.6);
+}
+
+.participants-grid-wrapper .participant-mini .status-icons-mini .icon-mini.inactive {
+    background: rgba(239, 68, 68, 0.6);
+}
+
+.participants-grid-wrapper .participant-mini .status-icons-mini .icon-mini.warning {
+    background: rgba(234, 179, 8, 0.8);
+}
+
+/* وضع شير سكرين - العرض الكامل */
+.screen-share-full {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 50;
+    background: #0a0a1a;
+    display: none;
+    flex-direction: column;
+}
+
+.screen-share-full.active {
+    display: flex;
+}
+
+.screen-share-full .screen-share-video {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.screen-share-full .screen-share-controls {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    background: rgba(0,0,0,0.7);
+    padding: 10px 20px;
+    border-radius: 30px;
+    backdrop-filter: blur(10px);
+}
+
+.screen-share-full .screen-share-controls button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 13px;
+}
+
+.screen-share-full .screen-share-controls button:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+.screen-share-full .screen-share-controls button.close-btn {
+    background: #dc3545;
+}
+
+.screen-share-full .screen-share-controls button.close-btn:hover {
+    background: #b02a37;
+}
+
+/* وضع شير سكرين - مع البطاقات */
+.screen-share-with-participants {
+    display: grid;
+    grid-template-columns: 70% 30%;
+    gap: 10px;
+    height: calc(100vh - 80px);
+    padding: 10px;
+}
+
+.screen-share-with-participants .screen-main {
+    position: relative;
+    background: #0a0a1a;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.screen-share-with-participants .screen-main video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.screen-share-with-participants .screen-main .screen-controls {
+    position: absolute;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+}
+
+.screen-share-with-participants .screen-main .screen-controls button {
+    padding: 6px 14px;
+    border: none;
+    border-radius: 20px;
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.3s;
+}
+
+.screen-share-with-participants .screen-main .screen-controls button:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+.screen-share-with-participants .participants-side {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    max-height: 100%;
+}
+
+.screen-share-with-participants .participants-side .participant-mini {
+    width: 100%;
+    aspect-ratio: 16/9;
+    max-height: 150px;
+    background: #0f3460;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.screen-share-with-participants .participants-side .participant-mini video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* زر تبديل العرض الكامل */
+.btn-fullscreen-share {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+    background: rgba(0,0,0,0.6);
+    border: none;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 14px;
+}
+
+.btn-fullscreen-share:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+@media (max-width: 768px) {
+    .screen-share-with-participants {
+        grid-template-columns: 1fr;
+        grid-template-rows: 60% 40%;
+    }
+    
+    .participants-grid-wrapper .participant-mini {
+        max-height: 80px;
+        min-height: 50px;
+    }
+    
+    .screen-share-with-participants .participants-side .participant-mini {
+        max-height: 80px;
+    }
+}
+/* ==================== مؤشرات الصوت على بطاقات الأعضاء ==================== */
+
+/* حاوية مؤشر الصوت */
+.participant-mini .audio-indicator {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    display: flex;
+    gap: 2px;
+    align-items: flex-end;
+    height: 16px;
+    z-index: 6;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.participant-mini .audio-indicator.active {
+    opacity: 1;
+}
+
+.participant-mini .audio-indicator .bar {
+    width: 3px;
+    background: rgba(34, 197, 94, 0.3);
+    border-radius: 1px;
+    transition: all 0.1s ease;
+}
+
+.participant-mini .audio-indicator .bar.active {
+    background: #22c55e;
+}
+
+.participant-mini .audio-indicator .bar:nth-child(1) { height: 4px; }
+.participant-mini .audio-indicator .bar:nth-child(2) { height: 7px; }
+.participant-mini .audio-indicator .bar:nth-child(3) { height: 10px; }
+.participant-mini .audio-indicator .bar:nth-child(4) { height: 13px; }
+.participant-mini .audio-indicator .bar:nth-child(5) { height: 16px; }
+
+/* مؤشر الصوت على البطاقة الرئيسية */
+.main-video-wrapper .audio-indicator-main {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    display: flex;
+    gap: 3px;
+    align-items: flex-end;
+    height: 25px;
+    z-index: 6;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.main-video-wrapper .audio-indicator-main.active {
+    opacity: 1;
+}
+
+.main-video-wrapper .audio-indicator-main .bar {
+    width: 4px;
+    background: rgba(34, 197, 94, 0.3);
+    border-radius: 2px;
+    transition: all 0.1s ease;
+}
+
+.main-video-wrapper .audio-indicator-main .bar.active {
+    background: #22c55e;
+}
+
+.main-video-wrapper .audio-indicator-main .bar:nth-child(1) { height: 6px; }
+.main-video-wrapper .audio-indicator-main .bar:nth-child(2) { height: 12px; }
+.main-video-wrapper .audio-indicator-main .bar:nth-child(3) { height: 18px; }
+.main-video-wrapper .audio-indicator-main .bar:nth-child(4) { height: 22px; }
+.main-video-wrapper .audio-indicator-main .bar:nth-child(5) { height: 25px; }
+
+/* تأثير النبض عند التحدث */
+.participant-mini.speaking {
+    border: 2px solid #22c55e;
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+    animation: speakingGlow 0.5s ease-in-out;
+}
+
+@keyframes speakingGlow {
+    0% { box-shadow: 0 0 10px rgba(34, 197, 94, 0.2); }
+    50% { box-shadow: 0 0 30px rgba(34, 197, 94, 0.5); }
+    100% { box-shadow: 0 0 10px rgba(34, 197, 94, 0.2); }
+}
+
+/* تأثير النبض للبطاقة الرئيسية */
+.main-video-wrapper.speaking {
+    border: 3px solid #22c55e;
+    box-shadow: 0 0 30px rgba(34, 197, 94, 0.3);
+    animation: speakingGlowMain 0.6s ease-in-out;
+}
+
+@keyframes speakingGlowMain {
+    0% { box-shadow: 0 0 15px rgba(34, 197, 94, 0.2); }
+    50% { box-shadow: 0 0 40px rgba(34, 197, 94, 0.5); }
+    100% { box-shadow: 0 0 15px rgba(34, 197, 94, 0.2); }
+}
+
+/* مؤشر الصوت في شريط المشاركين */
+.participant-avatar.speaking {
+    border-color: #22c55e !important;
+    animation: avatarPulse 0.5s ease-in-out infinite;
+}
+
+@keyframes avatarPulse {
+    0% { border-color: #22c55e; transform: scale(1); }
+    50% { border-color: #4ade80; transform: scale(1.1); }
+    100% { border-color: #22c55e; transform: scale(1); }
+}
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
@@ -2585,6 +2987,261 @@ function showHomePage() {
                 showToast('❌ خطأ في عرض الرسالة');
             }
         };
+// ==================== 1. متغيرات مؤشرات الصوت ====================
+let audioLevels = {};
+let speakingParticipants = {};
+let audioUpdateInterval = null;
+
+// ==================== 2. تحديث مؤشرات الصوت ====================
+function updateAudioIndicators() {
+    // تحديث مؤشر الصوت للمستخدم المحلي
+    updateLocalAudioIndicator();
+    
+    // تحديث مؤشرات الصوت للمشاركين الآخرين
+    updateRemoteAudioIndicators();
+}
+
+// ==================== 3. تحديث مؤشر الصوت المحلي ====================
+function updateLocalAudioIndicator() {
+    if (!localStream) return;
+    
+    const audioTracks = localStream.getAudioTracks();
+    if (audioTracks.length === 0 || !audioTracks[0].enabled) {
+        // المايك مكتوم
+        const indicator = document.querySelector('.audio-indicator-main');
+        if (indicator) indicator.classList.remove('active');
+        return;
+    }
+    
+    try {
+        // استخدام الـ analyser الموجود
+        if (analyser && dataArray) {
+            analyser.getByteFrequencyData(dataArray);
+            
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+            }
+            const average = sum / dataArray.length;
+            const level = average / 128;
+            
+            // تحديث مؤشر الصوت المحلي
+            const indicator = document.querySelector('.audio-indicator-main');
+            const bars = indicator ? indicator.querySelectorAll('.bar') : [];
+            
+            const activeBars = Math.floor(level * bars.length);
+            let isSpeaking = false;
+            
+            bars.forEach((bar, index) => {
+                if (index < activeBars) {
+                    bar.classList.add('active');
+                    if (level > 0.1) isSpeaking = true;
+                } else {
+                    bar.classList.remove('active');
+                }
+            });
+            
+            // تحديث حالة التحدث
+            const mainWrapper = document.querySelector('.main-video-wrapper');
+            if (mainWrapper) {
+                if (isSpeaking && level > 0.1) {
+                    mainWrapper.classList.add('speaking');
+                } else {
+                    mainWrapper.classList.remove('speaking');
+                }
+            }
+            
+            if (indicator) {
+                if (isSpeaking && level > 0.05) {
+                    indicator.classList.add('active');
+                } else {
+                    indicator.classList.remove('active');
+                }
+            }
+            
+            // تحديث حالة الصوت في البطاقة الرئيسية
+            updateLocalParticipantSpeaking(isSpeaking && level > 0.1);
+        }
+    } catch (error) {
+        // silent error
+    }
+}
+
+// ==================== 4. تحديث مؤشرات الصوت للمشاركين ====================
+function updateRemoteAudioIndicators() {
+    // هذه الدالة ستتلقى بيانات الصوت من المشاركين الآخرين عبر Firebase
+    // سيتم استدعاؤها عند استقبال بيانات الصوت
+}
+
+// ==================== 5. تحديث حالة التحدث للمشارك المحلي ====================
+function updateLocalParticipantSpeaking(isSpeaking) {
+    // تحديث البطاقة المحلية
+    const localCard = document.querySelector('.participant-mini#mainParticipantMini');
+    if (localCard) {
+        const indicator = localCard.querySelector('.audio-indicator');
+        if (indicator) {
+            if (isSpeaking) {
+                indicator.classList.add('active');
+                localCard.classList.add('speaking');
+            } else {
+                indicator.classList.remove('active');
+                localCard.classList.remove('speaking');
+            }
+        }
+    }
+}
+
+// ==================== 6. بدء تحديث مؤشرات الصوت ====================
+function startAudioIndicators() {
+    if (audioUpdateInterval) {
+        clearInterval(audioUpdateInterval);
+    }
+    
+    audioUpdateInterval = setInterval(() => {
+        updateAudioIndicators();
+    }, 100); // تحديث كل 100ms
+}
+
+// ==================== 7. إيقاف تحديث مؤشرات الصوت ====================
+function stopAudioIndicators() {
+    if (audioUpdateInterval) {
+        clearInterval(audioUpdateInterval);
+        audioUpdateInterval = null;
+    }
+}
+
+// ==================== 8. إنشاء بطاقة مشارك مع مؤشر صوت ====================
+function createParticipantCardWithAudio(participant, uid) {
+    const div = document.createElement('div');
+    div.className = 'participant-mini';
+    div.id = `participant_${uid}`;
+    div.dataset.uid = uid;
+    
+    const initial = (participant.name || 'U').charAt(0).toUpperCase();
+    const isHost = participant.isHost ? '👑' : '';
+    
+    div.innerHTML = `
+        <div class="avatar-placeholder">${initial}</div>
+        <div class="name-tag">${participant.name} ${isHost}</div>
+        <div class="status-icons-mini">
+            <span class="icon-mini ${participant.micEnabled !== false ? 'active' : 'inactive'}">
+                <i class="fas ${participant.micEnabled !== false ? 'fa-microphone' : 'fa-microphone-slash'}"></i>
+            </span>
+            <span class="icon-mini ${participant.videoEnabled !== false ? 'active' : 'inactive'}">
+                <i class="fas ${participant.videoEnabled !== false ? 'fa-video' : 'fa-video-slash'}"></i>
+            </span>
+        </div>
+        <div class="audio-indicator">
+            <span class="bar"></span>
+            <span class="bar"></span>
+            <span class="bar"></span>
+            <span class="bar"></span>
+            <span class="bar"></span>
+        </div>
+    `;
+    
+    div.onclick = () => {
+        showToast(`👤 ${participant.name} ${isHost}`);
+    };
+    
+    return div;
+}
+
+// ==================== 9. تحديث بطاقة مشارك عند التحدث ====================
+function updateParticipantSpeaking(uid, isSpeaking, audioLevel) {
+    const card = document.getElementById(`participant_${uid}`);
+    if (!card) return;
+    
+    const indicator = card.querySelector('.audio-indicator');
+    const bars = indicator ? indicator.querySelectorAll('.bar') : [];
+    
+    if (isSpeaking && audioLevel > 0.1) {
+        card.classList.add('speaking');
+        if (indicator) indicator.classList.add('active');
+        
+        // تحديث أعمدة الصوت
+        const level = Math.min(audioLevel / 128, 1);
+        const activeBars = Math.floor(level * bars.length);
+        
+        bars.forEach((bar, index) => {
+            if (index < activeBars) {
+                bar.classList.add('active');
+            } else {
+                bar.classList.remove('active');
+            }
+        });
+    } else {
+        card.classList.remove('speaking');
+        if (indicator) indicator.classList.remove('active');
+        
+        bars.forEach(bar => {
+            bar.classList.remove('active');
+        });
+    }
+}
+
+// ==================== 10. استقبال بيانات الصوت من المشاركين ====================
+function setupAudioListener(meetingId) {
+    // الاستماع لتحديثات الصوت من المشاركين
+    const audioRef = db.ref(`meetings/${meetingId}/audioLevels`);
+    audioRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            for (let uid in data) {
+                const level = data[uid];
+                const isSpeaking = level > 0.1;
+                updateParticipantSpeaking(uid, isSpeaking, level);
+            }
+        }
+    });
+}
+
+// ==================== 11. إرسال مستوى الصوت للمشاركين ====================
+function sendAudioLevel() {
+    if (!currentRoomMeetingId || !currentUser) return;
+    if (!analyser || !dataArray) return;
+    
+    try {
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i];
+        }
+        const average = sum / dataArray.length;
+        const level = average / 128;
+        
+        // إرسال مستوى الصوت إلى Firebase
+        const audioRef = db.ref(`meetings/${currentRoomMeetingId}/audioLevels/${currentUser.uid}`);
+        audioRef.set({
+            level: level,
+            timestamp: Date.now(),
+            isSpeaking: level > 0.1
+        });
+        
+        // تنظيف البيانات القديمة
+        cleanOldAudioData();
+    } catch (error) {
+        // silent error
+    }
+}
+
+// ==================== 12. تنظيف بيانات الصوت القديمة ====================
+function cleanOldAudioData() {
+    const audioRef = db.ref(`meetings/${currentRoomMeetingId}/audioLevels`);
+    audioRef.once('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            const now = Date.now();
+            for (let uid in data) {
+                if (data[uid] && data[uid].timestamp && (now - data[uid].timestamp > 5000)) {
+                    // إزالة البيانات القديمة
+                    audioRef.child(uid).remove();
+                }
+            }
+        }
+    });
+}
+
 
         // ==================== إرسال رسالة مع دعم البريد الخارجي ====================
         async function sendMessage() {
@@ -2824,7 +3481,342 @@ async function createNewMeeting(event) {
         showToast('❌ حدث خطأ في إنشاء الاجتماع');
     }
 }
+// ==================== 1. متغيرات التحكم في شير سكرين ====================
+let isScreenFullscreen = false;
+let screenShareElement = null;
 
+// ==================== 2. تشغيل شير سكرين مع تحسين العرض ====================
+async function roomToggleScreenShare() {
+    if (isScreenSharing) {
+        stopScreenShare();
+        return;
+    }
+    
+    try {
+        const screenConstraints = {
+            video: {
+                cursor: 'always',
+                displaySurface: 'monitor'
+            },
+            audio: false
+        };
+        
+        screenStream = await navigator.mediaDevices.getDisplayMedia(screenConstraints);
+        isScreenSharing = true;
+        
+        // إضافة شير سكرين للواجهة
+        addScreenShareToUI();
+        
+        // تغيير زر مشاركة الشاشة
+        const screenBtn = document.getElementById('roomScreenBtn');
+        if (screenBtn) {
+            screenBtn.classList.add('active');
+            screenBtn.innerHTML = '<i class="fas fa-desktop"></i>';
+            screenBtn.title = 'إيقاف مشاركة الشاشة';
+        }
+        
+        showToast('🖥️ جاري مشاركة الشاشة');
+        
+        screenStream.getVideoTracks()[0].onended = () => {
+            stopScreenShare();
+        };
+        
+    } catch (error) {
+        console.error('خطأ في مشاركة الشاشة:', error);
+        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+            showToast('❌ تم رفض إذن مشاركة الشاشة. الرجاء منح الإذن');
+        } else {
+            showToast('❌ تعذر مشاركة الشاشة');
+        }
+    }
+}
+
+// ==================== 3. إضافة شير سكرين للواجهة ====================
+function addScreenShareToUI() {
+    const container = document.getElementById('meetingRoomPage');
+    if (!container) return;
+    
+    // إزالة أي شير سكرين موجود
+    removeScreenShareFromUI();
+    
+    // إنشاء حاوية شير سكرين
+    const screenDiv = document.createElement('div');
+    screenDiv.id = 'screenShareContainer';
+    screenDiv.className = 'screen-share-with-participants';
+    
+    // الجزء الرئيسي للشير سكرين
+    screenDiv.innerHTML = `
+        <div class="screen-main">
+            <video id="screenShareVideo" autoplay playsinline></video>
+            <div class="screen-controls">
+                <button onclick="toggleScreenFullscreen()" title="عرض كامل">
+                    <i class="fas fa-expand"></i> عرض كامل
+                </button>
+                <button onclick="stopScreenShare()" style="background: #dc3545;">
+                    <i class="fas fa-stop"></i> إيقاف
+                </button>
+            </div>
+        </div>
+        <div class="participants-side" id="participantsSide">
+            <!-- سيتم وضع المشاركين هنا -->
+        </div>
+    `;
+    
+    // تعيين مصدر الفيديو
+    const video = screenDiv.querySelector('#screenShareVideo');
+    if (video && screenStream) {
+        video.srcObject = screenStream;
+        video.play();
+    }
+    
+    // إضافة قبل حاوية المشاركين الحالية
+    const existingLayout = container.querySelector('.meeting-layout');
+    if (existingLayout) {
+        existingLayout.style.display = 'none';
+    }
+    
+    container.appendChild(screenDiv);
+    
+    // نقل المشاركين الصغار إلى الجانب
+    moveParticipantsToSide();
+}
+
+// ==================== 4. نقل المشاركين إلى الجانب ====================
+function moveParticipantsToSide() {
+    const participantsSide = document.getElementById('participantsSide');
+    if (!participantsSide) return;
+    
+    // الحصول على المشاركين من القائمة الحالية
+    const existingParticipants = document.querySelectorAll('.participant-mini');
+    const mainParticipant = document.getElementById('mainParticipant');
+    
+    participantsSide.innerHTML = '';
+    
+    // إضافة المشارك الرئيسي
+    if (mainParticipant) {
+        const clone = mainParticipant.cloneNode(true);
+        clone.style.maxHeight = '150px';
+        clone.style.minHeight = '80px';
+        clone.id = 'mainParticipantMini';
+        participantsSide.appendChild(clone);
+    }
+    
+    // إضافة باقي المشاركين
+    existingParticipants.forEach((el, index) => {
+        if (el.id !== 'mainParticipant' && el.id !== 'mainParticipantMini') {
+            const clone = el.cloneNode(true);
+            clone.style.maxHeight = '120px';
+            clone.style.minHeight = '60px';
+            participantsSide.appendChild(clone);
+        }
+    });
+}
+
+// ==================== 5. إزالة شير سكرين من الواجهة ====================
+function removeScreenShareFromUI() {
+    const screenContainer = document.getElementById('screenShareContainer');
+    if (screenContainer) {
+        screenContainer.remove();
+    }
+    
+    const existingLayout = document.querySelector('.meeting-layout');
+    if (existingLayout) {
+        existingLayout.style.display = 'flex';
+    }
+}
+
+// ==================== 6. إيقاف شير سكرين ====================
+function stopScreenShare() {
+    if (screenStream) {
+        screenStream.getTracks().forEach(track => track.stop());
+        screenStream = null;
+    }
+    
+    isScreenSharing = false;
+    isScreenFullscreen = false;
+    
+    // إزالة شير سكرين من الواجهة
+    removeScreenShareFromUI();
+    
+    // إغلاق العرض الكامل
+    closeScreenFullscreen();
+    
+    // العودة إلى الكاميرا
+    if (localStream) {
+        const videoElement = document.getElementById('localVideo');
+        if (videoElement) {
+            videoElement.srcObject = localStream;
+            videoElement.play();
+        }
+    }
+    
+    const screenBtn = document.getElementById('roomScreenBtn');
+    if (screenBtn) {
+        screenBtn.classList.remove('active');
+        screenBtn.innerHTML = '<i class="fas fa-desktop"></i>';
+        screenBtn.title = 'مشاركة الشاشة';
+    }
+    
+    showToast('🖥️ تم إيقاف مشاركة الشاشة');
+}
+
+// ==================== 7. تبديل العرض الكامل لشير سكرين ====================
+function toggleScreenFullscreen() {
+    const container = document.getElementById('screenShareContainer');
+    if (!container) return;
+    
+    if (isScreenFullscreen) {
+        closeScreenFullscreen();
+    } else {
+        openScreenFullscreen();
+    }
+}
+
+// ==================== 8. فتح العرض الكامل ====================
+function openScreenFullscreen() {
+    const container = document.getElementById('screenShareContainer');
+    if (!container) return;
+    
+    isScreenFullscreen = true;
+    
+    // إخفاء المحتوى الحالي
+    const meetingLayout = document.querySelector('.meeting-layout');
+    if (meetingLayout) meetingLayout.style.display = 'none';
+    
+    // إنشاء العرض الكامل
+    const fullDiv = document.createElement('div');
+    fullDiv.id = 'screenFullscreen';
+    fullDiv.className = 'screen-share-full active';
+    
+    const video = container.querySelector('video');
+    const videoSrc = video ? video.srcObject : null;
+    
+    fullDiv.innerHTML = `
+        <video id="fullscreenVideo" autoplay playsinline style="flex:1;width:100%;height:100%;object-fit:contain;"></video>
+        <div class="screen-share-controls">
+            <button onclick="closeScreenFullscreen()">
+                <i class="fas fa-compress"></i> تصغير
+            </button>
+            <button onclick="stopScreenShare()" class="close-btn">
+                <i class="fas fa-stop"></i> إيقاف
+            </button>
+        </div>
+    `;
+    
+    const fullVideo = fullDiv.querySelector('#fullscreenVideo');
+    if (fullVideo && videoSrc) {
+        fullVideo.srcObject = videoSrc;
+        fullVideo.play();
+    }
+    
+    document.body.appendChild(fullDiv);
+    
+    // إخفاء الحاوية الأصلية
+    container.style.display = 'none';
+}
+
+// ==================== 9. إغلاق العرض الكامل ====================
+function closeScreenFullscreen() {
+    const fullDiv = document.getElementById('screenFullscreen');
+    if (fullDiv) {
+        fullDiv.remove();
+    }
+    
+    isScreenFullscreen = false;
+    
+    // إظهار الحاوية الأصلية
+    const container = document.getElementById('screenShareContainer');
+    if (container) {
+        container.style.display = 'grid';
+    }
+    
+    // إظهار المحتوى الحالي
+    const meetingLayout = document.querySelector('.meeting-layout');
+    if (meetingLayout) meetingLayout.style.display = 'flex';
+}
+
+// ==================== تحديث بطاقات المشاركين (معدل) ====================
+function updateParticipantCards(participants) {
+    const grid = document.getElementById('participantsGrid');
+    if (!grid) return;
+    
+    // تنظيف البطاقات الحالية
+    const mainParticipant = document.getElementById('mainParticipant');
+    grid.innerHTML = '';
+    
+    // إضافة البطاقة الرئيسية
+    if (mainParticipant) {
+        // إضافة مؤشر الصوت للبطاقة الرئيسية
+        let audioIndicator = mainParticipant.querySelector('.audio-indicator');
+        if (!audioIndicator) {
+            audioIndicator = document.createElement('div');
+            audioIndicator.className = 'audio-indicator';
+            audioIndicator.innerHTML = `
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+                <span class="bar"></span>
+            `;
+            mainParticipant.appendChild(audioIndicator);
+        }
+        grid.appendChild(mainParticipant);
+    }
+    
+    // إضافة باقي المشاركين
+    if (participants) {
+        const names = Object.keys(participants);
+        names.forEach((uid) => {
+            if (uid !== currentUser?.uid) {
+                const p = participants[uid];
+                // إضافة حالة المايك والكاميرا للمشارك
+                const card = createParticipantCard(p, uid);
+                grid.appendChild(card);
+            }
+        });
+    }
+}
+
+// ==================== إنشاء بطاقة مشارك (معدل مع مؤشر الصوت) ====================
+function createParticipantCard(participant, uid) {
+    const div = document.createElement('div');
+    div.className = 'participant-mini';
+    div.id = `participant_${uid}`;
+    div.dataset.uid = uid;
+    
+    const initial = (participant.name || 'U').charAt(0).toUpperCase();
+    const isHost = participant.isHost ? '👑' : '';
+    
+    // تحديد حالة المايك والكاميرا
+    const micEnabled = participant.micEnabled !== false;
+    const videoEnabled = participant.videoEnabled !== false;
+    
+    div.innerHTML = `
+        <div class="avatar-placeholder">${initial}</div>
+        <div class="name-tag">${participant.name} ${isHost}</div>
+        <div class="status-icons-mini">
+            <span class="icon-mini ${micEnabled ? 'active' : 'inactive'}">
+                <i class="fas ${micEnabled ? 'fa-microphone' : 'fa-microphone-slash'}"></i>
+            </span>
+            <span class="icon-mini ${videoEnabled ? 'active' : 'inactive'}">
+                <i class="fas ${videoEnabled ? 'fa-video' : 'fa-video-slash'}"></i>
+            </span>
+        </div>
+        <div class="audio-indicator">
+            <span class="bar"></span>
+            <span class="bar"></span>
+            <span class="bar"></span>
+            <span class="bar"></span>
+            <span class="bar"></span>
+        </div>
+    `;
+    
+    div.onclick = () => {
+        showToast(`👤 ${participant.name} ${isHost}`);
+    };
+    
+    return div;
+}
         async function loadMeetings() {
             try {
                 const snapshot = await db.ref('meetings').once('value');
@@ -3347,7 +4339,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let currentRoomMeetingId = null;
         let roomChatMessages = [];
 
-        // ==================== الانضمام للاجتماع (تعديل) ====================
+       // ==================== الانضمام للاجتماع (معدل) ====================
 async function joinMeetingRoom(meetingId) {
     try {
         const snapshot = await db.ref(`meetings/${meetingId}`).once('value');
@@ -3359,12 +4351,10 @@ async function joinMeetingRoom(meetingId) {
         
         // التحقق من غرفة الانتظار
         if (meeting.settings?.waitingRoom && meeting.creatorId !== currentUser?.uid) {
-            // التحقق من الموافقة
             const pending = meeting.pendingParticipants || {};
             const isPending = pending[currentUser?.uid];
             
             if (!isPending && !meeting.participants?.[currentUser?.uid]) {
-                // طلب الانضمام
                 await requestJoinMeeting(meetingId);
                 return;
             }
@@ -3375,6 +4365,26 @@ async function joinMeetingRoom(meetingId) {
         
         document.getElementById('roomMeetingTitle').innerText = meeting.title;
         document.getElementById('roomMeetingLink').innerText = meeting.meetingId;
+        
+        // إنشاء حاوية التخطيط
+        const roomPage = document.getElementById('meetingRoomPage');
+        if (roomPage) {
+            // إضافة حاوية التخطيط إذا لم تكن موجودة
+            let layout = roomPage.querySelector('.meeting-layout');
+            if (!layout) {
+                layout = document.createElement('div');
+                layout.className = 'meeting-layout';
+                // نقل المحتوى إلى الحاوية الجديدة
+                const content = roomPage.querySelector('.p-4');
+                if (content) {
+                    const parent = content.parentNode;
+                    parent.insertBefore(layout, content);
+                    layout.appendChild(content);
+                    // تعديل الـ p-4 ليكون main-video-wrapper
+                    content.className = 'main-video-wrapper';
+                }
+            }
+        }
         
         // محاولة تشغيل الكاميرا والمايك
         await startLocalStream();
@@ -3391,14 +4401,9 @@ async function joinMeetingRoom(meetingId) {
             await db.ref(`meetings/${meetingId}/participants`).set(meeting.participants);
         }
         
-        // إزالة من قائمة الانتظار
-        if (meeting.pendingParticipants && meeting.pendingParticipants[currentUser?.uid]) {
-            const pending = meeting.pendingParticipants;
-            delete pending[currentUser.uid];
-            await db.ref(`meetings/${meetingId}/pendingParticipants`).set(pending);
-        }
-        
+        // تحديث المشاركين
         updateRoomParticipants(meeting.participants);
+        updateParticipantCards(meeting.participants);
         loadRoomChatMessages(meetingId);
         
         if (meeting.status !== 'live') {
@@ -3667,35 +4672,39 @@ function showAppInstallPrompt(storeLink) {
 }
 
 
-        function updateRoomParticipants(participants) {
-            const bar = document.getElementById('roomParticipantsBar');
-            const count = document.getElementById('roomParticipantCount');
-            
-            if (!participants) {
-                bar.innerHTML = '<span class="text-white/50 text-xs">المشاركون: 0</span>';
-                count.innerText = '0 مشارك';
-                return;
-            }
-            
-            const names = Object.keys(participants);
-            const countNum = names.length;
-            
-            let html = '<span class="text-white/50 text-xs">المشاركون:</span>';
-            names.forEach((uid, index) => {
-                if (index < 5) {
-                    const p = participants[uid];
-                    const initial = (p.name || 'U').charAt(0).toUpperCase();
-                    const isHost = p.isHost ? '👑' : '';
-                    html += `<span class="participant-avatar active" title="${p.name} ${isHost}">${initial}</span>`;
-                }
-            });
-            if (countNum > 5) {
-                html += `<span class="text-white/50 text-xs">+${countNum - 5}</span>`;
-            }
-            
-            bar.innerHTML = html;
-            count.innerText = `${countNum} مشارك`;
+     // ==================== تحديث المشاركين (معدل) ====================
+function updateRoomParticipants(participants) {
+    const bar = document.getElementById('roomParticipantsBar');
+    const count = document.getElementById('roomParticipantCount');
+    
+    if (!participants) {
+        bar.innerHTML = '<span class="text-white/50 text-xs">المشاركون: 0</span>';
+        count.innerText = '0 مشارك';
+        return;
+    }
+    
+    const names = Object.keys(participants);
+    const countNum = names.length;
+    
+    let html = '<span class="text-white/50 text-xs">المشاركون:</span>';
+    names.forEach((uid, index) => {
+        if (index < 5) {
+            const p = participants[uid];
+            const initial = (p.name || 'U').charAt(0).toUpperCase();
+            const isHost = p.isHost ? '👑' : '';
+            html += `<span class="participant-avatar active" title="${p.name} ${isHost}">${initial}</span>`;
         }
+    });
+    if (countNum > 5) {
+        html += `<span class="text-white/50 text-xs">+${countNum - 5}</span>`;
+    }
+    
+    bar.innerHTML = html;
+    count.innerText = `${countNum} مشارك`;
+    
+    // تحديث البطاقات
+    updateParticipantCards(participants);
+}
 
         async function loadRoomChatMessages(meetingId) {
             try {
@@ -3856,7 +4865,14 @@ async function startLocalStream() {
                     return false;
                 }
             }
-            
+            // بعد تشغيل المايك بنجاح
+    if (hasMic) {
+        startAudioIndicators();
+        // بدء إرسال مستوى الصوت
+        setInterval(() => {
+            sendAudioLevel();
+        }, 200);
+    }
             // إذا كان الخطأ بسبب رفض الإذن
             if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
                 showToast('⚠️ تم رفض إذن الكاميرا والمايك. الرجاء منح الإذن من المتصفح');
