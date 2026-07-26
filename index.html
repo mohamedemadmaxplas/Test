@@ -11,6 +11,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+<!-- ==================== مكتبات LiveKit ==================== -->
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@1.15.0/dist/livekit-client.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsonwebtoken@9.0.0/dist/jwt.min.js"></script>
     <style>
         /* تأكيد ظهور المحتوى */
         #loginPage:not(.hidden),
@@ -4294,6 +4297,20 @@
     </div>
 
     <script>
+        // ==================== بيانات LiveKit ====================
+const LIVEKIT_URL = 'wss://tecnosherk-meet-83dxkxag.livekit.cloud';
+const LIVEKIT_API_KEY = 'APIcPTrP2xF2SQ';
+const LIVEKIT_API_SECRET = '6yYjFcSfSAbCLaSd7fABxpFkp6722KvRFgPBBfXkNU9D';
+
+// ==================== متغيرات LiveKit ====================
+let liveKitRoom = null;
+let liveKitTracks = [];
+let liveKitParticipants = {};
+let isScreenSharingLiveKit = false;
+let screenShareLiveKitTrack = null;
+let isMicEnabledLiveKit = true;
+let isVideoEnabledLiveKit = true;
+let currentLiveKitMeetingId = null;
        // ==================== تهيئة Firebase ====================
 const firebaseConfig = {
     apiKey: "AIzaSyD54ifCxvtFuj-445hikUBzI2Q1DkSsVNk",
@@ -4446,7 +4463,7 @@ let isScreenSharingMode = false;
 let participantCards = {};
 let localParticipantId = null;
 
-// ==================== إنشاء تخطيط غرفة الاجتماع (مع تقسيم ديناميكي) ====================
+// ==================== createMeetingLayout - معدلة لاستخدام LiveKit ====================
 function createMeetingLayout(participants) {
     const container = document.getElementById('meetingMainContainer');
     if (!container) return;
@@ -4455,8 +4472,8 @@ function createMeetingLayout(participants) {
     
     const participantCount = Object.keys(participants || {}).length;
     
-    // إذا كان هناك شير سكرين
-    if (isScreenSharing && screenStream) {
+    // ✅ التحقق من مشاركة الشاشة عبر LiveKit
+    if (isScreenSharingLiveKit && screenShareLiveKitTrack) {
         // صف المشاركين في الأعلى
         const topRow = document.createElement('div');
         topRow.className = 'participants-top-row';
@@ -4470,30 +4487,24 @@ function createMeetingLayout(participants) {
         screenWrapper.innerHTML = `
             <video id="screenShareVideo" autoplay playsinline></video>
             <div class="screen-controls-overlay">
-                <button onclick="toggleScreenFullscreen()" class="fullscreen-btn">
+                <button onclick="toggleLiveKitFullscreen()" class="fullscreen-btn">
                     <i class="fas fa-expand"></i> عرض كامل
                 </button>
-                <button onclick="stopScreenShare()" class="stop-screen-btn">
+                <button onclick="stopLiveKitScreenShare()" class="stop-screen-btn">
                     <i class="fas fa-stop"></i> إيقاف
                 </button>
             </div>
         `;
-        const video = screenWrapper.querySelector('#screenShareVideo');
-        if (video && screenStream) {
-            video.srcObject = screenStream;
-            video.play();
-        }
         container.appendChild(screenWrapper);
         
         // تحديث صف المشاركين
         updateParticipantsRow(participants || {});
         
     } else {
-        // لا يوجد شير سكرين - شبكة ديناميكية
+        // ✅ شبكة ديناميكية بدون شير سكرين
         const gridDiv = document.createElement('div');
         gridDiv.className = 'meeting-grid-layout';
         
-        // تحديد حجم الشبكة حسب عدد المشاركين
         if (participantCount <= 1) {
             gridDiv.classList.add('grid-1');
         } else if (participantCount === 2) {
@@ -4510,7 +4521,6 @@ function createMeetingLayout(participants) {
             gridDiv.classList.add('grid-more');
         }
         
-        // إضافة بطاقات المشاركين
         const names = Object.keys(participants || {});
         names.forEach((uid, index) => {
             const p = participants[uid];
@@ -4521,7 +4531,6 @@ function createMeetingLayout(participants) {
         container.appendChild(gridDiv);
     }
     
-    // تحديث معلومات الرأس
     updateHeaderParticipantsInfo(participants || {});
 }
 // ==================== إنشاء بطاقة مشارك كبيرة للشبكة 2x2 ====================
@@ -4900,7 +4909,7 @@ function updateSpeakingIndicator(uid, isSpeaking) {
 
 
 
-// ==================== فتح العرض الكامل (مُصلح بالكامل) ====================
+// ==================== openScreenFullscreen - معدلة لاستخدام LiveKit ====================
 function openScreenFullscreen() {
     // التأكد من عدم وجود عرض كامل مفتوح
     const existing = document.getElementById('screenShareFullscreen');
@@ -4909,9 +4918,10 @@ function openScreenFullscreen() {
     }
     
     // الحصول على فيديو الشير سكرين
-    const screenVideo = document.getElementById('screenShareVideo');
     let videoSrc = null;
     
+    // ✅ التحقق من LiveKit أولاً
+    const screenVideo = document.getElementById('screenShareVideo');
     if (screenVideo && screenVideo.srcObject) {
         videoSrc = screenVideo.srcObject;
     } else {
@@ -4934,30 +4944,24 @@ function openScreenFullscreen() {
     
     fullDiv.innerHTML = `
         <video id="fullscreenVideo" autoplay playsinline></video>
-       <!-- داخل fullscreen-controls -->
-<div class="fullscreen-controls">
-    <button onclick="closeScreenFullscreen()" class="close-fullscreen-btn">
-        <i class="fas fa-compress"></i> تصغير
-    </button>
-    <button onclick="stopScreenShare()" class="stop-fullscreen-btn">
-        <i class="fas fa-stop"></i> إيقاف المشاركة
-    </button>
-</div>
+        <div class="fullscreen-controls">
+            <button onclick="closeScreenFullscreen()" class="close-fullscreen-btn">
+                <i class="fas fa-compress"></i> تصغير
+            </button>
+            <button onclick="stopScreenShare()" class="stop-fullscreen-btn">
+                <i class="fas fa-stop"></i> إيقاف المشاركة
+            </button>
+        </div>
     `;
     
-    // إضافة إلى الصفحة
     document.body.appendChild(fullDiv);
     
-    // تعيين مصدر الفيديو
     const fullVideo = fullDiv.querySelector('#fullscreenVideo');
     if (fullVideo && videoSrc) {
-        // إنشاء مسار فيديو جديد لتجنب مشاكل الإزالة
         try {
-            // استخدام نفس المصدر ولكن مع clone
             fullVideo.srcObject = videoSrc;
             fullVideo.play().catch(e => {
                 console.log('خطأ في تشغيل الفيديو الكامل:', e);
-                // محاولة إعادة التشغيل
                 setTimeout(() => {
                     fullVideo.play().catch(e2 => console.log('فشل إعادة التشغيل:', e2));
                 }, 100);
@@ -4967,7 +4971,6 @@ function openScreenFullscreen() {
         }
     }
     
-    // إضافة مستمع للضغط على ESC
     document.addEventListener('keydown', function escHandler(e) {
         if (e.key === 'Escape') {
             closeScreenFullscreen();
@@ -4977,8 +4980,7 @@ function openScreenFullscreen() {
     
     showToast('🖥️ تم تكبير الشاشة');
 }
-
-// ==================== إغلاق العرض الكامل (مُصلح بالكامل) ====================
+// ==================== closeScreenFullscreen - معدلة لاستخدام LiveKit ====================
 function closeScreenFullscreen() {
     const fullDiv = document.getElementById('screenShareFullscreen');
     if (!fullDiv) {
@@ -4989,30 +4991,24 @@ function closeScreenFullscreen() {
     const video = fullDiv.querySelector('video');
     if (video) {
         try {
-            // إيقاف التشغيل
             video.pause();
-            // إزالة المصدر
             video.srcObject = null;
-            // إزالة أي مسارات
             video.load();
         } catch (error) {
             console.log('خطأ في إيقاف الفيديو:', error);
         }
     }
     
-    // إزالة العنصر
     fullDiv.remove();
     
-    // إزالة مستمع ESC
     document.removeEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
             closeScreenFullscreen();
         }
     });
     
-    // تحديث واجهة الشير سكرين
+    // ✅ تحديث واجهة الشير سكرين (سواء LiveKit أو عادي)
     setTimeout(() => {
-        // التأكد من أن فيديو الشير سكرين لا يزال يعمل
         const screenVideo = document.getElementById('screenShareVideo');
         if (screenVideo && screenVideo.srcObject) {
             screenVideo.play().catch(e => console.log('إعادة تشغيل الشير سكرين:', e));
@@ -6242,7 +6238,326 @@ function createParticipantCardWithAudio(participant, uid) {
     
     return div;
 }
+// ==================== 1. إنشاء Token ====================
+function generateLiveKitToken(meetingId, userName, userId) {
+    try {
+        const now = Math.floor(Date.now() / 1000);
+        const payload = {
+            iss: LIVEKIT_API_KEY,
+            nbf: now,
+            exp: now + 3600,
+            sub: userId || userName || 'guest',
+            name: userName || 'مستخدم',
+            video: {
+                room: meetingId,
+                roomJoin: true,
+                canPublish: true,
+                canSubscribe: true
+            }
+        };
+        const token = jwt.sign(payload, LIVEKIT_API_SECRET, { algorithm: 'HS256' });
+        console.log('✅ Token created');
+        return token;
+    } catch (error) {
+        console.error('❌ Token error:', error);
+        return null;
+    }
+}
 
+// ==================== 2. الاتصال بـ LiveKit ====================
+async function connectToLiveKit(meetingId, userName, userId) {
+    try {
+        // إنشاء الغرفة
+        liveKitRoom = new window.LiveKit.Room({
+            adaptiveStream: true,
+            dynacast: true,
+            stopLocalTrackOnUnpublish: true
+        });
+
+        // إعداد المستمعات
+        setupLiveKitListeners();
+
+        // توليد التوكن
+        const token = generateLiveKitToken(meetingId, userName, userId);
+        if (!token) {
+            showToast('❌ فشل في إنشاء التوكن');
+            return false;
+        }
+
+        // الاتصال بالسيرفر
+        await liveKitRoom.connect(LIVEKIT_URL, token);
+        console.log('✅ تم الاتصال بـ LiveKit');
+        currentLiveKitMeetingId = meetingId;
+        currentRoomMeetingId = meetingId;
+
+        // تشغيل الأجهزة المحلية
+        await publishLocalTracksLiveKit();
+        showToast('✅ تم الدخول إلى الاجتماع');
+        return true;
+    } catch (error) {
+        console.error('❌ خطأ في الاتصال:', error);
+        showToast('❌ فشل الاتصال بالاجتماع');
+        return false;
+    }
+}
+
+// ==================== 3. نشر المسارات المحلية ====================
+async function publishLocalTracksLiveKit() {
+    try {
+        const tracks = await window.LiveKit.createLocalTracks({
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            },
+            video: {
+                resolution: window.LiveKit.VideoPresets.h720.resolution,
+                frameRate: window.LiveKit.VideoPresets.h720.frameRate
+            }
+        });
+
+        liveKitTracks = tracks;
+
+        for (const track of tracks) {
+            await liveKitRoom.localParticipant.publishTrack(track);
+            console.log(`✅ تم نشر ${track.kind}`);
+        }
+
+        const videoTrack = tracks.find(t => t.kind === 'video');
+        if (videoTrack) {
+            const localVideo = document.getElementById('localVideo');
+            if (localVideo) {
+                videoTrack.attach(localVideo);
+                localVideo.muted = true;
+                localVideo.play().catch(e => console.log('فيديو محلي:', e));
+            }
+        }
+
+        return true;
+    } catch (error) {
+        console.error('❌ خطأ في تشغيل الأجهزة:', error);
+        showToast('❌ تعذر تشغيل الكاميرا أو المايك');
+        return false;
+    }
+}
+
+// ==================== 4. مستمعات LiveKit ====================
+function setupLiveKitListeners() {
+    if (!liveKitRoom) return;
+
+    // تغيير حالة الاتصال
+    liveKitRoom.on(window.LiveKit.RoomEvent.ConnectionStateChanged, (state) => {
+        console.log('🔗 حالة الاتصال:', state);
+        if (state === 'disconnected') {
+            showToast('⚠️ تم قطع الاتصال');
+        }
+    });
+
+    // انضمام مشارك جديد
+    liveKitRoom.on(window.LiveKit.RoomEvent.ParticipantConnected, (participant) => {
+        console.log('👤 انضم:', participant.identity);
+        liveKitParticipants[participant.sid] = participant;
+        updateLiveKitParticipantsUI();
+        showToast(`👤 ${participant.name || participant.identity} انضم`);
+        
+        // تحديث المشاركين في Firebase (للتحكم فقط)
+        if (currentLiveKitMeetingId && currentUser) {
+            db.ref(`meetings/${currentLiveKitMeetingId}/participants/${participant.identity}`).set({
+                name: participant.name || participant.identity,
+                joinedAt: new Date().toISOString(),
+                isHost: false,
+                micEnabled: true,
+                videoEnabled: true
+            });
+        }
+    });
+
+    // مغادرة مشارك
+    liveKitRoom.on(window.LiveKit.RoomEvent.ParticipantDisconnected, (participant) => {
+        console.log('👤 غادر:', participant.identity);
+        delete liveKitParticipants[participant.sid];
+        updateLiveKitParticipantsUI();
+        removeLiveKitParticipantVideo(participant.sid);
+        
+        // إزالة من Firebase
+        if (currentLiveKitMeetingId) {
+            db.ref(`meetings/${currentLiveKitMeetingId}/participants/${participant.identity}`).remove();
+        }
+    });
+
+    // استقبال مسار جديد
+    liveKitRoom.on(window.LiveKit.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+        console.log('📹 استقبال مسار من:', participant.identity, track.kind);
+
+        if (track.kind === 'video') {
+            displayLiveKitRemoteVideo(participant, track);
+        } else if (track.kind === 'audio') {
+            displayLiveKitRemoteAudio(participant, track);
+        } else if (track.kind === 'screen_share') {
+            displayLiveKitScreenShare(track);
+        }
+    });
+
+    // إلغاء الاشتراك في مسار
+    liveKitRoom.on(window.LiveKit.RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+        console.log('📹 إلغاء استقبال مسار من:', participant.identity);
+        if (track.kind === 'screen_share') {
+            removeLiveKitScreenShareUI();
+        }
+    });
+}
+
+// ==================== 5. عرض فيديو عن بعد ====================
+function displayLiveKitRemoteVideo(participant, track) {
+    let container = document.getElementById(`remoteVideo_${participant.sid}`);
+
+    if (!container) {
+        const grid = document.getElementById('participantsGrid');
+        if (!grid) return;
+
+        container = document.createElement('div');
+        container.className = 'participant-mini';
+        container.id = `remoteVideo_${participant.sid}`;
+        container.dataset.sid = participant.sid;
+
+        const nameTag = document.createElement('div');
+        nameTag.className = 'name-tag';
+        nameTag.innerText = participant.name || participant.identity;
+        container.appendChild(nameTag);
+
+        grid.appendChild(container);
+    }
+
+    const video = document.createElement('video');
+    video.autoplay = true;
+    video.playsinline = true;
+    track.attach(video);
+    container.appendChild(video);
+
+    updateLiveKitParticipantsUI();
+}
+
+// ==================== 6. عرض صوت عن بعد ====================
+function displayLiveKitRemoteAudio(participant, track) {
+    console.log(`🎤 صوت من: ${participant.name}`);
+}
+
+// ==================== 7. عرض مشاركة الشاشة ====================
+function displayLiveKitScreenShare(track) {
+    isScreenSharingLiveKit = true;
+    screenShareLiveKitTrack = track;
+
+    let container = document.getElementById('screenShareContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'screenShareContainer';
+        container.className = 'screen-share-wrapper';
+        document.getElementById('meetingMainContainer')?.prepend(container);
+    }
+
+    container.innerHTML = `
+        <div class="screen-share-content">
+            <video id="screenShareVideo" autoplay playsinline></video>
+            <div class="screen-controls-overlay">
+                <button onclick="toggleLiveKitFullscreen()" class="fullscreen-btn">
+                    <i class="fas fa-expand"></i> عرض كامل
+                </button>
+                ${liveKitRoom?.localParticipant?.identity === track.participant?.identity ? `
+                    <button onclick="stopLiveKitScreenShare()" class="stop-btn">
+                        <i class="fas fa-stop"></i> إيقاف
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `;
+
+    const video = container.querySelector('#screenShareVideo');
+    if (video) {
+        track.attach(video);
+        video.play();
+    }
+
+    showToast('🖥️ تم بدء مشاركة الشاشة');
+}
+
+// ==================== 8. إزالة واجهة الشاشة ====================
+function removeLiveKitScreenShareUI() {
+    const container = document.getElementById('screenShareContainer');
+    if (container) container.remove();
+    isScreenSharingLiveKit = false;
+    screenShareLiveKitTrack = null;
+    showToast('🖥️ تم إيقاف مشاركة الشاشة');
+}
+
+// ==================== 9. إزالة فيديو مشارك ====================
+function removeLiveKitParticipantVideo(sid) {
+    const container = document.getElementById(`remoteVideo_${sid}`);
+    if (container) container.remove();
+}
+
+// ==================== 10. تحديث واجهة المشاركين ====================
+function updateLiveKitParticipantsUI() {
+    const bar = document.getElementById('roomParticipantsBar');
+    const count = document.getElementById('roomParticipantCount');
+
+    if (!bar) return;
+
+    const names = Object.keys(liveKitParticipants);
+    const countNum = names.length + (liveKitRoom?.localParticipant ? 1 : 0);
+
+    let html = `<span class="text-white/50 text-xs">المشاركون: ${countNum}</span>`;
+    names.forEach((sid) => {
+        const p = liveKitParticipants[sid];
+        const initial = (p.name || p.identity || 'U').charAt(0).toUpperCase();
+        html += `<span class="participant-avatar active" title="${p.name || p.identity}">${initial}</span>`;
+    });
+
+    if (liveKitRoom?.localParticipant) {
+        html += `<span class="participant-avatar active" title="أنت" style="border-color: #22c55e;">أ</span>`;
+    }
+
+    bar.innerHTML = html;
+    if (count) count.innerText = `${countNum} مشارك`;
+    updateLiveKitHeaderParticipantsInfo();
+}
+
+// ==================== 11. تحديث رأس الاجتماع ====================
+function updateLiveKitHeaderParticipantsInfo() {
+    const container = document.getElementById('headerParticipantsInfo');
+    if (!container) return;
+
+    const count = Object.keys(liveKitParticipants).length + (liveKitRoom?.localParticipant ? 1 : 0);
+    container.innerHTML = `<span>${count} مشارك</span>`;
+}
+
+// ==================== 12. مغادرة الاجتماع ====================
+async function leaveLiveKitRoom() {
+    try {
+        if (liveKitRoom) {
+            for (const track of liveKitTracks) {
+                track.stop();
+            }
+            liveKitTracks = [];
+            liveKitRoom.disconnect();
+            liveKitRoom = null;
+            liveKitParticipants = {};
+            isScreenSharingLiveKit = false;
+            screenShareLiveKitTrack = null;
+            currentLiveKitMeetingId = null;
+            currentRoomMeetingId = null;
+
+            document.getElementById('participantsGrid').innerHTML = '';
+            removeLiveKitScreenShareUI();
+
+            showToast('✅ تم مغادرة الاجتماع');
+            showSpecificPage('meetingsRoomPage');
+            loadMeetings();
+        }
+    } catch (error) {
+        console.error('❌ خطأ في مغادرة الغرفة:', error);
+        showToast('❌ حدث خطأ في مغادرة الاجتماع');
+    }
+}
 // ==================== 9. تحديث بطاقة مشارك عند التحدث ====================
 function updateParticipantSpeaking(uid, isSpeaking, audioLevel) {
     const card = document.getElementById(`participant_${uid}`);
@@ -7236,7 +7551,7 @@ function removeScreenShareFromUI() {
 }
 
 
-// ==================== تبديل العرض الكامل (مُصلح) ====================
+// ==================== toggleScreenFullscreen - معدلة لاستخدام LiveKit ====================
 function toggleScreenFullscreen() {
     const fullscreen = document.getElementById('screenShareFullscreen');
     if (fullscreen && fullscreen.classList.contains('active')) {
@@ -7247,7 +7562,15 @@ function toggleScreenFullscreen() {
 }
 
 
-
+// ==================== toggleLiveKitFullscreen - جديدة للتحكم في عرض LiveKit ====================
+function toggleLiveKitFullscreen() {
+    const fullscreen = document.getElementById('screenShareFullscreen');
+    if (fullscreen && fullscreen.classList.contains('active')) {
+        closeScreenFullscreen();
+    } else {
+        openScreenFullscreen();
+    }
+}
 
 // ==================== إنشاء التخطيط العادي (معدل) ====================
 function createNormalLayout() {
@@ -8054,30 +8377,32 @@ function showParticipantsManagement() {
     document.body.appendChild(modal);
 }
 
-// ==================== إخراج مشارك من الاجتماع ====================
+// ==================== removeParticipant - معدلة لاستخدام LiveKit ====================
 async function removeParticipant(uid) {
     if (!confirm('هل أنت متأكد من إخراج هذا المشارك من الاجتماع؟')) return;
     
     try {
+        // ✅ إزالة من Firebase
         const participantsRef = db.ref(`meetings/${currentRoomMeetingId}/participants/${uid}`);
         await participantsRef.remove();
         
-        // إغلاق اتصال WebRTC
-        if (peerConnections[uid]) {
-            peerConnections[uid].close();
-            delete peerConnections[uid];
-        }
-        if (remoteStreams[uid]) {
-            delete remoteStreams[uid];
+        // ✅ إزالة من LiveKit (إذا كان موجود)
+        if (liveKitRoom) {
+            // LiveKit يدير المشاركين بنفسه، لكن نقدر نطلب إزالة
+            const participant = liveKitRoom.getParticipantBySid(uid) || liveKitRoom.getParticipantByIdentity(uid);
+            if (participant) {
+                // LiveKit لا يدعم إزالة المشاركين مباشرة،
+                // لكننا نزيلهم من Firebase فقط
+            }
         }
         
         showToast('✅ تم إخراج المشارك من الاجتماع');
         
-        // تحديث القائمة
+        // ✅ تحديث القائمة
         const modal = document.getElementById('participantsManagementModal');
         if (modal) modal.remove();
         
-        // تحديث المشاركين
+        // ✅ تحديث المشاركين
         const snapshot = await db.ref(`meetings/${currentRoomMeetingId}/participants`).once('value');
         const participants = snapshot.val();
         if (participants) {
@@ -8174,7 +8499,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // ==================== دوال غرفة الاجتماع الفعلية (WebRTC) ====================
         let currentRoomMeetingId = null;
         let roomChatMessages = [];
-// ==================== الانضمام للاجتماع (مع WebRTC) ====================
+// ==================== joinMeetingRoom - معدلة لاستخدام LiveKit ====================
 async function joinMeetingRoom(meetingId) {
     try {
         const snapshot = await db.ref(`meetings/${meetingId}`).once('value');
@@ -8184,7 +8509,7 @@ async function joinMeetingRoom(meetingId) {
             return;
         }
         
-        // التحقق من غرفة الانتظار
+        // ✅ التحقق من غرفة الانتظار
         if (meeting.settings?.waitingRoom && meeting.creatorId !== currentUser?.uid) {
             const pending = meeting.pendingParticipants || {};
             const isPending = pending[currentUser?.uid];
@@ -8200,20 +8525,23 @@ async function joinMeetingRoom(meetingId) {
             }
         }
         
-        currentRoomMeetingId = meetingId;
-        showSpecificPage('meetingRoomPage');
+        // ✅ استخدم LiveKit بدلاً من WebRTC القديم
+        const userName = currentUser.name || currentUser.username || 'مستخدم';
+        const userId = currentUser.uid || 'user_' + Date.now();
         
-        // تعيين عنوان الاجتماع
-        const titleEl = document.getElementById('roomMeetingTitle');
-        if (titleEl) titleEl.innerText = meeting.title || 'الاجتماع';
+        // ✅ الاتصال عبر LiveKit
+        const connected = await connectToLiveKit(meetingId, userName, userId);
+        if (!connected) {
+            showToast('❌ فشل الاتصال بالاجتماع');
+            return;
+        }
         
-        const linkEl = document.getElementById('roomMeetingLink');
-        if (linkEl) linkEl.innerText = meeting.meetingId || meetingId;
+        // ✅ تحديث حالة الاجتماع
+        if (meeting.status !== 'live') {
+            await db.ref(`meetings/${meetingId}/status`).set('live');
+        }
         
-        // تشغيل الكاميرا والمايك
-        await startLocalStream();
-        
-        // إضافة المشارك
+        // ✅ إضافة المشارك في Firebase (للتحكم فقط)
         if (!meeting.participants) meeting.participants = {};
         if (!meeting.participants[currentUser.uid]) {
             meeting.participants[currentUser.uid] = {
@@ -8227,52 +8555,31 @@ async function joinMeetingRoom(meetingId) {
             await db.ref(`meetings/${meetingId}/participants`).set(meeting.participants);
         }
         
-        // تخزين المشاركين
+        // ✅ تخزين المشاركين
         window.roomParticipants = meeting.participants;
         
-        // بدء الاستماع للإشارات (Signaling)
-        listenForSignaling(meetingId);
-        
-        // إرسال عروض للمشاركين الحاليين
-        const participantIds = Object.keys(meeting.participants);
-        for (const uid of participantIds) {
-            if (uid !== currentUser.uid) {
-                await sendOffer(uid);
-            }
-        }
-        
-        // إنشاء التخطيط
+        // ✅ إنشاء التخطيط
         createMeetingLayout(meeting.participants);
         updateHeaderParticipantsInfo(meeting.participants);
         loadRoomChatMessages(meetingId);
         
-        // تحديث حالة الاجتماع
-        if (meeting.status !== 'live') {
-            await db.ref(`meetings/${meetingId}/status`).set('live');
-        }
-        
-        // الاستماع لتحديثات المشاركين
+        // ✅ الاستماع لتحديثات المشاركين (من Firebase فقط للتحكم)
         listenForParticipantUpdates(meetingId);
         
-        // الاستماع لطلبات الدخول (للمنشئ)
+        // ✅ الاستماع لطلبات الدخول (للمنشئ)
         if (meeting.creatorId === currentUser?.uid) {
             listenForJoinRequests(meetingId);
         }
         
-        // بدء إرسال مستوى الصوت
-        setInterval(() => {
-            sendAudioLevel();
-        }, 200);
-        
-        showToast('✅ مرحباً بك في الاجتماع');
+        showToast('✅ مرحباً بك في الاجتماع (LiveKit)');
         
     } catch (error) {
-        console.error('خطأ في الانضمام للاجتماع:', error);
+        console.error('❌ خطأ في الانضمام للاجتماع:', error);
         showToast('❌ حدث خطأ في الانضمام للاجتماع');
     }
 }
 
-// ==================== الاستماع لتحديثات المشاركين ====================
+// ==================== listenForParticipantUpdates - معدلة لاستخدام LiveKit ====================
 function listenForParticipantUpdates(meetingId) {
     const participantsRef = db.ref(`meetings/${meetingId}/participants`);
     
@@ -8280,9 +8587,15 @@ function listenForParticipantUpdates(meetingId) {
         const participants = snapshot.val();
         if (participants) {
             window.roomParticipants = participants;
-            // تحديث صف المشاركين فقط
+            // ✅ تحديث صف المشاركين
             updateParticipantsRow(participants);
             updateHeaderParticipantsInfo(participants);
+            
+            // ✅ تحديث LiveKit UI
+            if (liveKitRoom) {
+                // تحديث الـ UI من Firebase (للتحكم فقط)
+                // LiveKit يدير المشاركين بنفسه
+            }
         }
     });
 }
@@ -8526,7 +8839,7 @@ function showAppInstallPrompt(storeLink) {
 }
 
 
-     // ==================== تحديث المشاركين (معدل) ====================
+   // ==================== updateRoomParticipants - معدلة لاستخدام LiveKit ====================
 function updateRoomParticipants(participants) {
     const bar = document.getElementById('roomParticipantsBar');
     const count = document.getElementById('roomParticipantCount');
@@ -8537,18 +8850,32 @@ function updateRoomParticipants(participants) {
         return;
     }
     
-    const names = Object.keys(participants);
-    const countNum = names.length;
+    // ✅ دمج المشاركين من Firebase و LiveKit
+    const liveKitNames = Object.keys(liveKitParticipants || {});
+    const firebaseNames = Object.keys(participants || {});
+    const allNames = [...new Set([...liveKitNames, ...firebaseNames])];
+    const countNum = allNames.length + (liveKitRoom?.localParticipant ? 1 : 0);
     
     let html = '<span class="text-white/50 text-xs">المشاركون:</span>';
-    names.forEach((uid, index) => {
-        if (index < 5) {
-            const p = participants[uid];
-            const initial = (p.name || 'U').charAt(0).toUpperCase();
-            const isHost = p.isHost ? '👑' : '';
-            html += `<span class="participant-avatar active" title="${p.name} ${isHost}">${initial}</span>`;
+    
+    // عرض المشاركين من LiveKit
+    Object.keys(liveKitParticipants).forEach((sid, index) => {
+        if (index < 4) {
+            const p = liveKitParticipants[sid];
+            const initial = (p.name || p.identity || 'U').charAt(0).toUpperCase();
+            html += `<span class="participant-avatar active" title="${p.name || p.identity}">${initial}</span>`;
         }
     });
+    
+    // عرض المشاركين من Firebase (اللي مش موجودين في LiveKit)
+    firebaseNames.forEach((uid, index) => {
+        if (!liveKitParticipants[uid]) {
+            const p = participants[uid];
+            const initial = (p.name || 'U').charAt(0).toUpperCase();
+            html += `<span class="participant-avatar active" title="${p.name}">${initial}</span>`;
+        }
+    });
+    
     if (countNum > 5) {
         html += `<span class="text-white/50 text-xs">+${countNum - 5}</span>`;
     }
@@ -8635,111 +8962,47 @@ function updateRoomParticipants(participants) {
         }
 
         
-// ==================== تشغيل الكاميرا والمايك (مع كشف الأجهزة) ====================
+// ==================== startLocalStream - معدلة (تُستبدل بـ publishLocalTracksLiveKit) ====================
 async function startLocalStream() {
-    let hasCamera = false;
-    let hasMic = false;
+    // ✅ هذه الدالة أصبحت غير مستخدمة مع LiveKit
+    // لأن LiveKit يدير الأجهزة بنفسه عبر createLocalTracks
+    // لكن نحتفظ بها للتوافق مع الكود القديم
     
+    console.log('⚠️ startLocalStream مستبدلة بـ publishLocalTracksLiveKit');
+    
+    // ✅ محاولة تشغيل الأجهزة عبر LiveKit
+    if (liveKitRoom) {
+        return await publishLocalTracksLiveKit();
+    }
+    
+    // ✅ Fallback للطريقة القديمة (للتوافق)
     try {
-        // التحقق من وجود أجهزة
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter(d => d.kind === 'videoinput');
-        const audioDevices = devices.filter(d => d.kind === 'audioinput');
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: true
+        });
+        localStream = stream;
         
-        hasCamera = videoDevices.length > 0;
-        hasMic = audioDevices.length > 0;
-        
-        // بناء القيود حسب الأجهزة المتاحة
-        const constraints = {
-            video: hasCamera ? {
-                facingMode: 'user',
-                width: { ideal: 640 },
-                height: { ideal: 480 }
-            } : false,
-            audio: hasMic ? {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true
-            } : false
-        };
-        
-        try {
-            localStream = await navigator.mediaDevices.getUserMedia(constraints);
-            
-            hasCamera = localStream.getVideoTracks().length > 0;
-            hasMic = localStream.getAudioTracks().length > 0;
-            
-            // عرض الفيديو إذا كانت الكاميرا متاحة
-            const videoElement = document.getElementById('localVideo');
-            if (videoElement && hasCamera) {
-                videoElement.srcObject = localStream;
-                videoElement.play();
-            }
-            
-            // تحديث حالة الأجهزة
-            updateDeviceStatus(hasCamera, hasMic);
-            
-            // تشغيل مؤشر الصوت إذا كان المايك متاحاً
-            if (hasMic) {
-                startAudioVisualizer();
-                // بدء تحديث مؤشر الصوت
-                setInterval(updateAudioIndicator, 100);
-            }
-            
-            const msg = hasCamera && hasMic ? '✅ تم تشغيل الكاميرا والمايك' :
-                       hasCamera ? '✅ تم تشغيل الكاميرا فقط (لا يوجد مايك)' :
-                       hasMic ? '✅ تم تشغيل المايك فقط (لا توجد كاميرا)' :
-                       '⚠️ لا توجد كاميرا أو مايك متصل';
-            showToast(msg);
-            return true;
-            
-        } catch (error) {
-            console.error('خطأ في تشغيل الأجهزة:', error);
-            
-            // محاولة تشغيل الصوت فقط إذا فشلت الكاميرا
-            if (hasMic && !hasCamera) {
-                try {
-                    const audioOnly = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    localStream = audioOnly;
-                    hasMic = true;
-                    hasCamera = false;
-                    updateDeviceStatus(false, true);
-                    showToast('⚠️ تم تشغيل المايك فقط (تعذر تشغيل الكاميرا)');
-                    return true;
-                } catch (audioError) {
-                    showToast('❌ تعذر تشغيل المايك');
-                    updateDeviceStatus(false, false);
-                    return false;
-                }
-            }
-            
-            // إذا كان الخطأ بسبب رفض الإذن
-            if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-                showToast('⚠️ تم رفض إذن الكاميرا والمايك');
-            } else if (error.name === 'NotFoundError') {
-                showToast('⚠️ لا توجد كاميرا أو مايك متصل');
-            } else {
-                showToast('❌ حدث خطأ في تشغيل الكاميرا والمايك');
-            }
-            
-            updateDeviceStatus(false, false);
-            return false;
+        const videoElement = document.getElementById('localVideo');
+        if (videoElement) {
+            videoElement.srcObject = stream;
+            videoElement.play();
         }
         
+        return true;
     } catch (error) {
-        console.error('خطأ في فحص الأجهزة:', error);
-        updateDeviceStatus(false, false);
+        console.error('❌ خطأ في تشغيل الأجهزة:', error);
         return false;
     }
 }
-// ==================== تحديث حالة الأجهزة في الواجهة ====================
+// ==================== updateDeviceStatus - معدلة لاستخدام LiveKit ====================
 function updateDeviceStatus(hasCamera, hasMic) {
     // تحديث أيقونة المايك
     const micIcon = document.getElementById('micStatusIcon');
     const micBtn = document.getElementById('roomMicBtn');
     
     if (micIcon) {
-        if (hasMic) {
+        if (hasMic || isMicEnabledLiveKit) {
             micIcon.className = 'icon active';
             micIcon.innerHTML = '<i class="fas fa-microphone"></i>';
             micIcon.title = 'المايك متصل';
@@ -8752,13 +9015,16 @@ function updateDeviceStatus(hasCamera, hasMic) {
     }
     
     if (micBtn) {
-        if (hasMic) {
+        if (hasMic || isMicEnabledLiveKit) {
             micBtn.classList.remove('inactive', 'no-device');
             micBtn.classList.add('active');
+            micBtn.style.background = '';
+            micBtn.innerHTML = '<i class="fas fa-microphone"></i>';
         } else {
             micBtn.classList.remove('active');
             micBtn.classList.add('inactive', 'no-device');
             micBtn.innerHTML = '<i class="fas fa-microphone-slash"></i>';
+            micBtn.style.background = '#dc3545';
         }
     }
     
@@ -8767,7 +9033,7 @@ function updateDeviceStatus(hasCamera, hasMic) {
     const videoBtn = document.getElementById('roomVideoBtn');
     
     if (videoIcon) {
-        if (hasCamera) {
+        if (hasCamera || isVideoEnabledLiveKit) {
             videoIcon.className = 'icon active';
             videoIcon.innerHTML = '<i class="fas fa-video"></i>';
             videoIcon.title = 'الكاميرا متصلة';
@@ -8780,13 +9046,16 @@ function updateDeviceStatus(hasCamera, hasMic) {
     }
     
     if (videoBtn) {
-        if (hasCamera) {
+        if (hasCamera || isVideoEnabledLiveKit) {
             videoBtn.classList.remove('inactive', 'no-device');
             videoBtn.classList.add('active');
+            videoBtn.style.background = '';
+            videoBtn.innerHTML = '<i class="fas fa-video"></i>';
         } else {
             videoBtn.classList.remove('active');
             videoBtn.classList.add('inactive', 'no-device');
             videoBtn.innerHTML = '<i class="fas fa-video-slash"></i>';
+            videoBtn.style.background = '#dc3545';
         }
     }
 }
@@ -8834,93 +9103,16 @@ function updateDeviceStatus(hasCamera, hasMic) {
             animationFrame = requestAnimationFrame(updateAudioVisualizer);
         }
 
-  // ==================== كتم وإلغاء كتم المايك (مع علامة التعجب) ====================
+  // ==================== roomToggleMic - معدلة لاستخدام LiveKit ====================
 function roomToggleMic() {
-    if (!localStream) {
-        showToast('❌ لا يوجد مايك متصل');
-        return;
-    }
-    
-    const audioTracks = localStream.getAudioTracks();
-    if (audioTracks.length === 0) {
-        showToast('❌ لا يوجد مايك متصل');
-        return;
-    }
-    
-    const enabled = audioTracks[0].enabled;
-    audioTracks[0].enabled = !enabled;
-    
-    const micBtn = document.getElementById('roomMicBtn');
-    const micIcon = micBtn.querySelector('i');
-    
-    if (enabled) {
-        // كتم الصوت
-        micBtn.classList.remove('active', 'no-device');
-        micBtn.classList.add('inactive');
-        micBtn.style.background = '#dc3545';
-        micIcon.className = 'fas fa-microphone-slash';
-        micBtn.title = 'المايك مكتوم';
-        showToast('🔇 تم كتم المايك');
-    } else {
-        // إلغاء كتم الصوت
-        micBtn.classList.remove('inactive', 'no-device');
-        micBtn.classList.add('active');
-        micBtn.style.background = '';
-        micIcon.className = 'fas fa-microphone';
-        micBtn.title = 'كتم الصوت';
-        showToast('🎤 تم تفعيل المايك');
-    }
-    
-    // تحديث حالة المستخدم في Firebase
-    if (currentRoomMeetingId && currentUser) {
-        db.ref(`meetings/${currentRoomMeetingId}/participants/${currentUser.uid}/micEnabled`).set(!enabled);
-    }
+    // ✅ استخدام LiveKit للتحكم في المايك
+    toggleLiveKitMic();
 }
 
-// ==================== إيقاف/تشغيل الكاميرا (مع علامة التعجب) ====================
+// ==================== roomToggleVideo - معدلة لاستخدام LiveKit ====================
 function roomToggleVideo() {
-    if (!localStream) {
-        showToast('❌ لا توجد كاميرا متصلة');
-        return;
-    }
-    
-    const videoTracks = localStream.getVideoTracks();
-    if (videoTracks.length === 0) {
-        showToast('❌ لا توجد كاميرا متصلة');
-        return;
-    }
-    
-    const enabled = videoTracks[0].enabled;
-    videoTracks[0].enabled = !enabled;
-    
-    const videoBtn = document.getElementById('roomVideoBtn');
-    const videoIcon = videoBtn.querySelector('i');
-    const placeholder = document.getElementById('videoPlaceholder');
-    
-    if (enabled) {
-        // إيقاف الكاميرا
-        videoBtn.classList.remove('active', 'no-device');
-        videoBtn.classList.add('inactive');
-        videoBtn.style.background = '#dc3545';
-        videoIcon.className = 'fas fa-video-slash';
-        videoBtn.title = 'الكاميرا متوقفة';
-        if (placeholder) placeholder.style.display = 'flex';
-        showToast('📹 تم إيقاف الكاميرا');
-    } else {
-        // تشغيل الكاميرا
-        videoBtn.classList.remove('inactive', 'no-device');
-        videoBtn.classList.add('active');
-        videoBtn.style.background = '';
-        videoIcon.className = 'fas fa-video';
-        videoBtn.title = 'إيقاف الكاميرا';
-        if (placeholder) placeholder.style.display = 'none';
-        showToast('📹 تم تفعيل الكاميرا');
-    }
-    
-    // تحديث حالة المستخدم في Firebase
-    if (currentRoomMeetingId && currentUser) {
-        db.ref(`meetings/${currentRoomMeetingId}/participants/${currentUser.uid}/videoEnabled`).set(!enabled);
-    }
+    // ✅ استخدام LiveKit للتحكم في الكاميرا
+    toggleLiveKitVideo();
 }
 // ==================== رفع اليد ====================
 let handRaised = false;
@@ -9133,56 +9325,24 @@ styleSheet.textContent = `
     }
 `;
 document.head.appendChild(styleSheet);
-       // ==================== مشاركة الشاشة ====================
+      // ==================== roomToggleScreenShare - معدلة لاستخدام LiveKit ====================
 async function roomToggleScreenShare() {
-    if (isScreenSharing) {
-        stopScreenShare();
+    // ✅ استخدام LiveKit لمشاركة الشاشة
+    await toggleLiveKitScreenShare();
+}
+
+// ==================== stopScreenShare - معدلة لاستخدام LiveKit ====================
+function stopScreenShare() {
+    // ✅ إغلاق العرض الكامل أولاً
+    closeScreenFullscreen();
+    
+    // ✅ استخدام LiveKit لإيقاف مشاركة الشاشة
+    if (isScreenSharingLiveKit) {
+        stopLiveKitScreenShare();
         return;
     }
     
-    try {
-        const screenConstraints = {
-            video: {
-                cursor: 'always',
-                displaySurface: 'monitor'
-            },
-            audio: false
-        };
-        
-        screenStream = await navigator.mediaDevices.getDisplayMedia(screenConstraints);
-        isScreenSharing = true;
-        isScreenSharingMode = true;
-        
-        // تحديث التخطيط
-        const participants = window.roomParticipants || {};
-        createMeetingLayout(participants);
-        
-        const screenBtn = document.getElementById('roomScreenBtn');
-        if (screenBtn) {
-            screenBtn.classList.add('active');
-            screenBtn.innerHTML = '<i class="fas fa-desktop"></i>';
-        }
-        
-        showToast('🖥️ جاري مشاركة الشاشة');
-        
-        screenStream.getVideoTracks()[0].onended = () => {
-            stopScreenShare();
-        };
-        
-    } catch (error) {
-        console.error('خطأ في مشاركة الشاشة:', error);
-        if (error.name !== 'AbortError' && error.name !== 'NotAllowedError') {
-            showToast('❌ تعذر مشاركة الشاشة');
-        }
-    }
-}
-
-// ==================== إيقاف مشاركة الشاشة (مُصلح) ====================
-function stopScreenShare() {
-    // إغلاق العرض الكامل أولاً
-    closeScreenFullscreen();
-    
-    // إيقاف تدفق الشير سكرين
+    // ✅ Fallback للطريقة القديمة
     if (screenStream) {
         try {
             screenStream.getTracks().forEach(track => {
@@ -9213,40 +9373,29 @@ function stopScreenShare() {
     
     showToast('🖥️ تم إيقاف مشاركة الشاشة');
 }
-
        
 
-       // ==================== مغادرة الاجتماع ====================
+      // ==================== leaveMeetingRoom - معدلة لاستخدام LiveKit ====================
 async function leaveMeetingRoom() {
+    // ✅ استخدام LiveKit للمغادرة
+    await leaveLiveKitRoom();
+    
+    // ✅ تنظيف Firebase
     if (currentRoomMeetingId) {
         try {
-            // إزالة المستخدم من المشاركين
-            const snapshot = await db.ref(`meetings/${currentRoomMeetingId}/participants`).once('value');
-            const participants = snapshot.val();
-            if (participants && participants[currentUser.uid]) {
-                delete participants[currentUser.uid];
-                await db.ref(`meetings/${currentRoomMeetingId}/participants`).set(participants);
-            }
+            const participantsRef = db.ref(`meetings/${currentRoomMeetingId}/participants/${currentUser.uid}`);
+            await participantsRef.remove();
         } catch (error) {
             console.error('خطأ في مغادرة الاجتماع:', error);
         }
     }
     
-    // إيقاف الكاميرا والمايك
-    if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        localStream = null;
-    }
-    if (screenStream) {
-        screenStream.getTracks().forEach(track => track.stop());
-        screenStream = null;
-        isScreenSharing = false;
-    }
-    
+    // ✅ تنظيف المتغيرات القديمة
     currentRoomMeetingId = null;
     window.roomParticipants = {};
-    document.getElementById('roomChatPanel').classList.remove('active');
+    document.getElementById('roomChatPanel')?.classList.remove('active');
     
+    // ✅ العودة لصفحة الاجتماعات
     showSpecificPage('meetingsRoomPage');
     loadMeetings();
     showToast('✅ تم مغادرة الاجتماع');
